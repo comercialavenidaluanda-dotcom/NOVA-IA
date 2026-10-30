@@ -12,7 +12,7 @@
     "build": "tsc --noEmit && esbuild server/index.ts --bundle --platform=node --format=cjs --outfile=dist-server/index.cjs --external:express --external:cors --external:multer --external:ffmpeg-static && vite build",
     "start:api": "node dist-server/index.cjs",
     "desktop": "concurrently -k \"npm:dev:web\" \"npm:dev:api\" \"wait-on http://localhost:5173 && electron electron/main.cjs\"",
-    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:win": "npm run build && electron-builder --win nsis --publish never",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
