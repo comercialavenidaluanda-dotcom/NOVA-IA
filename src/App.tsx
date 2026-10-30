@@ -15,7 +15,7 @@ const modules = [
 ];
 
 export default function App() {
-  const [active, setActive] = useState("editor");
+  const [active, setActive] = useState("developer");
   const [clips, setClips] = useState<Clip[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [provider, setProvider] = useState<Provider>("openai");
