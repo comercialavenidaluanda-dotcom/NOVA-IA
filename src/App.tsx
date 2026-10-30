@@ -80,12 +80,13 @@ export default function App() {
   function moveSelectedClip(direction: -1 | 1) {
     if (!selectedClip) return;
     setClips(old => {
-      const from = old.findIndex(c => c.id === selectedClip.id);
+      const track = old.filter(c => c.kind === selectedClip.kind);
+      const from = track.findIndex(c => c.id === selectedClip.id);
       const to = from + direction;
-      if (from < 0 || to < 0 || to >= old.length) return old;
-      const next = [...old];
-      [next[from], next[to]] = [next[to], next[from]];
-      return next;
+      if (from < 0 || to < 0 || to >= track.length) return old;
+      const a = track[from].id;
+      const b = track[to].id;
+      return old.map(c => c.id === a ? track[to] : c.id === b ? track[from] : c);
     });
     setStatus(direction < 0 ? "Clip movido para cima na sequência." : "Clip movido para baixo na sequência.");
   }
