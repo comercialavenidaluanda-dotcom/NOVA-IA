@@ -4,8 +4,12 @@ on:
   push:
     branches:
       - main
+      - feature/web-first-vercel
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - main
 permissions:
   contents: read
 jobs:
@@ -25,8 +29,10 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Package Windows installer
+        if: github.event_name != 'pull_request' || github.head_ref == 'feature/web-first-vercel'
         run: npm run dist:win
       - name: Upload installer
+        if: github.event_name != 'pull_request' || github.head_ref == 'feature/web-first-vercel'
         uses: actions/upload-artifact@v4
         with:
           name: nova-ai-studio-windows

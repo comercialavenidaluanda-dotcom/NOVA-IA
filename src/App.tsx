@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Aperture, AudioLines, Bot, Code2, Copy, Download, Film, FolderOpen, ImagePlus, Layers3, Mic2, MonitorPlay, Plus, Scissors, Settings2, Sparkles, Upload, WandSparkles, RotateCcw, RotateCw, FlipHorizontal, SlidersHorizontal, Eye, Files, TerminalSquare, MessageSquare, Image as ImageIcon, ChevronUp, ChevronDown } from "lucide-react";
+import { Aperture, AudioLines, Bot, Code2, Copy, Download, Film, FolderOpen, ImagePlus, Layers3, Mic2, MonitorPlay, Plus, Scissors, Settings2, Sparkles, Upload, WandSparkles, RotateCcw, RotateCw, FlipHorizontal, SlidersHorizontal, Eye, Files, TerminalSquare, MessageSquare, Image as ImageIcon, ChevronUp, ChevronDown, CircleHelp } from "lucide-react";
 
 type Clip = { id: string; name: string; url: string; file?: File; kind: string; duration: number; trimStart: number; trimEnd: number; volume: number; speed: number; effect: string };
 type Provider = "openai" | "google" | "anthropic";
@@ -12,7 +12,8 @@ const modules = [
   { id: "video", label: "Vídeo IA", icon: WandSparkles },
   { id: "voice", label: "Estúdio de voz", icon: Mic2 },
   { id: "assets", label: "Biblioteca", icon: FolderOpen },
-  { id: "settings", label: "Configurar IA", icon: Settings2 }
+  { id: "settings", label: "Configurar IA", icon: Settings2 },
+  { id: "help", label: "Ajuda e primeiros passos", icon: CircleHelp }
 ];
 
 export default function App() {
@@ -46,7 +47,6 @@ export default function App() {
     window.novaSecureStore?.hasGeminiKey().then(saved => {
       if (!mounted) return;
       setGeminiKeySaved(saved);
-      if (!saved) setActive("settings");
     }).catch(() => { if (mounted) setGeminiKeySaved(false); });
     return () => { mounted = false; };
   }, []);
@@ -64,6 +64,10 @@ export default function App() {
 
   function patchClip(id: string, patch: Partial<Clip>) { setClips(old => old.map(c => c.id === id ? { ...c, ...patch } : c)); }
   async function exportSelectedVideo() {
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" && window.location.protocol !== "file:") {
+      setStatus("A exportação MP4 online ainda está em integração. Podes importar e preparar clips nesta versão web; o motor de renderização será ligado numa etapa própria.");
+      return;
+    }
     if (!selectedClip || selectedClip.kind !== "video" || !selectedClip.file) {
       setStatus("Seleciona um vídeo importado nesta sessão para renderizar.");
       return;
@@ -161,21 +165,28 @@ export default function App() {
   }
 
   async function testGeminiConnection() {
-    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
-    if (!activeKey) { setStatus("Introduz ou guarda a tua Gemini API Key para testar a ligação."); return; }
+    if (testingGemini) return;
     setTestingGemini(true);
-    setStatus("A validar a chave Gemini…");
+    setStatus("A preparar teste de ligação Gemini…");
     try {
+      const activeKey = apiKey.trim() || (window.novaSecureStore
+        ? await window.novaSecureStore.getGeminiKey()
+        : "");
+      if (!activeKey) throw new Error("Introduz a Gemini API Key antes de testar a ligação.");
+
+      setStatus("A validar a chave Gemini com o Google…");
       const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
       const response = await fetch(apiBase + "/api/ai/google/models", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: activeKey })
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Não foi possível validar a chave Gemini.");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível validar a chave Gemini (" + response.status + ").");
       const available = Array.isArray(data.models) ? data.models : [];
+      if (!available.length) throw new Error("A chave foi aceite, mas o Google não devolveu modelos compatíveis.");
       setGeminiModels(available);
-      const preferred = available.find((item: { name: string }) => item.name === "gemini-2.5-flash")?.name || available[0]?.name || "gemini-2.5-flash";
+      const preferred = available.find((item: { name: string }) => item.name === "models/gemini-2.5-flash")?.name || available[0]?.name || "gemini-2.5-flash";
       setModel(preferred.replace(/^models\//, ""));
       setStatus("Gemini ligado. " + available.length + " modelo(s) compatível(is) encontrado(s).");
     } catch (error) {
@@ -186,37 +197,55 @@ export default function App() {
   }
 
   async function askAI() {
-    const activeKey = apiKey.trim() || (provider === "google" && window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
-    if (!activeKey || !prompt.trim()) { setStatus("Introduz ou guarda a chave API e escreve o pedido."); return; }
+    if (busy) return;
+    const cleanPrompt = prompt.trim();
+    if (!cleanPrompt) { setStatus("Escreve o pedido antes de executar."); return; }
     const chosenModel = model.trim() || (provider === "google" ? "gemini-2.5-flash" : "");
     if (!chosenModel) { setStatus("Indica o ID do modelo para este fornecedor."); return; }
-    setBusy(true); setAnswer(""); setStatus("A contactar " + provider + "…");
+
+    setBusy(true);
+    setAnswer("");
+    setStatus("A preparar pedido…");
+    let requestStarted = false;
     try {
+      const activeKey = apiKey.trim() || (provider === "google" && window.novaSecureStore
+        ? await window.novaSecureStore.getGeminiKey()
+        : "");
+      if (!activeKey) throw new Error("Introduz a chave API do fornecedor selecionado.");
+
+      setStatus("A contactar " + provider + "…");
+      requestStarted = true;
       const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
       const response = await fetch(apiBase + "/api/ai/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, apiKey: activeKey, model: chosenModel, prompt })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, apiKey: activeKey, model: chosenModel, prompt: cleanPrompt })
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Falha no fornecedor");
-      setAnswer(data.text || "O fornecedor não devolveu texto.");
-      setStatus("Resposta recebida");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "O servidor de IA recusou o pedido (" + response.status + ").");
+      const responseText = typeof data.text === "string" ? data.text.trim() : "";
+      if (!responseText) throw new Error("O fornecedor respondeu sem texto. Verifica o modelo e a chave API.");
+      setAnswer(responseText);
+      setStatus("Resposta recebida com sucesso.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Erro ao contactar IA");
-    } finally { setBusy(false); setApiKey(""); }
+      setStatus(error instanceof Error ? error.message : "Erro inesperado ao contactar a IA.");
+    } finally {
+      setBusy(false);
+      if (requestStarted) setApiKey("");
+    }
   }
 
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Aperture size={22}/></div><div><strong>NOVA <span>AI</span> STUDIO</strong><small>CREATE WITHOUT LIMITS</small></div></div>
       <div className="project-name"><span className="live-dot"/> Projeto sem título <span className="saved">● Local</span></div>
-      <div className="top-actions"><button className="ghost" onClick={() => setActive("settings")}><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
+      <div className="top-actions"><button type="button" className="ghost" onClick={() => { setActive("help"); setStatus("A abrir Ajuda e primeiros passos."); }}><CircleHelp size={16}/> Ajuda</button><button type="button" className="ghost" onClick={() => { setActive("settings"); setStatus("A abrir Configurar IA."); }}><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
     </header>
     <div className="workspace">
       <aside className="sidebar">
         <div className="side-label">WORKSPACE</div>
-        {modules.map(m => <button key={m.id} className={"nav-item " + (active === m.id ? "active" : "")} onClick={() => setActive(m.id)}><m.icon size={18}/>{m.label}</button>)}
-        <div className="side-bottom"><div className="side-label">NOVA AI</div><div className="plan-card"><Sparkles size={17}/><b>Studio multimodelo</b><p>Liga os teus fornecedores oficiais de IA.</p><button onClick={() => setActive("settings")}>Configurar IA</button></div><div className="version">NOVA AI STUDIO · Preview 0.1</div></div>
+        {modules.map(m => <button type="button" key={m.id} className={"nav-item " + (active === m.id ? "active" : "")} aria-current={active === m.id ? "page" : undefined} onClick={() => { setActive(m.id); setStatus("A abrir " + m.label + "."); }}><m.icon size={18}/>{m.label}</button>)}
+        <div className="side-bottom"><div className="side-label">NOVA AI</div><div className="plan-card"><Sparkles size={17}/><b>Studio multimodelo</b><p>Liga os teus fornecedores oficiais de IA.</p><button type="button" onClick={() => { setActive("settings"); setStatus("A abrir Configurar IA."); }}>Configurar IA</button></div><div className="version">NOVA AI STUDIO · Preview 0.1</div></div>
       </aside>
       <main className="main">
         {active === "editor" && <section className="editor-view">
@@ -256,7 +285,7 @@ export default function App() {
               <div className="build-composer">
                 <div className="composer-options"><label>Fornecedor <ProviderSelect provider={provider} setProvider={p => { setProvider(p); setModel(p === "google" ? "gemini-2.5-flash" : ""); }}/>{provider === "google" && geminiModels.length > 0 ? <select className="model-input" value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select> : <input className="model-input" value={model} onChange={e => setModel(e.target.value)} placeholder={provider === "google" ? "gemini-2.5-flash" : "ID do modelo"}/>}</label><label className="key-entry">Chave API <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={provider === "google" ? "Gemini API Key" : "Chave oficial do fornecedor"}/></label></div>{provider === "google" && <div className="gemini-tools"><span>{geminiKeySaved ? "Chave Gemini guardada neste computador" : "Google AI · chave não guardada"} · modelos da tua chave</span><div className="gemini-tool-actions"><button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button><button className="outline" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar…" : "Testar ligação Gemini"}</button></div></div>}
                 <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Descreve o que queres criar ou alterar neste projecto…"/>
-                <div className="composer-bottom"><span><MessageSquare size={13}/> As chaves são usadas apenas neste pedido</span><button className="primary" disabled={busy} onClick={askAI}><Sparkles size={15}/>{busy ? "A processar…" : "Executar pedido"}</button></div>
+                <div className="composer-bottom"><span><MessageSquare size={13}/> As chaves são usadas apenas neste pedido</span><button type="button" className="primary" disabled={busy} onClick={askAI}><Sparkles size={15}/>{busy ? "A processar…" : "Executar pedido"}</button></div><div className={"composer-status" + (busy ? " is-busy" : "")} role="status" aria-live="polite">{status}</div>
               </div>
             </div>
             <aside className="build-preview">
@@ -267,23 +296,24 @@ export default function App() {
             </aside>
           </div>
         </section>}
+{active === "help" && <section className="tool-view help-view"><span className="eyebrow">CENTRO DE AJUDA · NOVA AI STUDIO</span><h1>Como começar</h1><p>Escolhe uma área para abrir. As funções em integração estão identificadas para não confundir demonstrações com ferramentas já operacionais.</p><div className="help-grid"><button className="help-card" onClick={() => setActive("developer")}><Code2/><b>Build Studio</b><span>Conversa com os modelos de IA e envia pedidos técnicos. A execução automática de código ainda está em desenvolvimento.</span><em>Abrir Build Studio →</em></button><button className="help-card" onClick={() => setActive("editor")}><Film/><b>Editor de vídeo</b><span>Importa media, seleciona um clip, ajusta os parâmetros e renderiza o vídeo selecionado.</span><em>Abrir editor →</em></button><button className="help-card" onClick={() => setActive("photo-editor")}><ImageIcon/><b>Editor de fotografias</b><span>Abre uma imagem, ajusta luz, contraste, saturação, corte e exporta em PNG ou JPEG.</span><em>Abrir Photo Lab →</em></button><button className="help-card" onClick={() => setActive("settings")}><Settings2/><b>Configurar fornecedores</b><span>Introduz a chave do fornecedor no campo próprio. No navegador, usa-a apenas durante a sessão; o armazenamento encriptado requer a aplicação Windows.</span><em>Abrir configurações →</em></button></div><div className="help-note"><CircleHelp size={18}/><span>Nota: Geração de imagem, Vídeo IA, Estúdio de voz, Biblioteca e agente autónomo ainda estão em integração. Os respetivos ecrãs não representam funções concluídas.</span></div></section>}
 {active === "settings" && <section className="tool-view setup-view">
           <span className="eyebrow">PRIMEIRO ARRANQUE · CONFIGURAÇÃO LOCAL</span>
           <h1>Configuração do NOVA AI STUDIO</h1>
           <p>Configura os fornecedores de inteligência artificial neste computador. Não precisas de criar GitHub Secrets para usar a tua Gemini API Key.</p>
           <div className="setup-card">
-            <div className="setup-card-heading"><div><span className="setup-kicker">FORNECEDOR PRINCIPAL</span><h2>Google Gemini</h2><p>Project ID: 655392085298</p></div><span className={geminiKeySaved ? "setup-status connected" : "setup-status"}>{geminiKeySaved ? "Chave guardada neste PC" : "Configuração pendente"}</span></div>
+            <div className="setup-card-heading"><div><span className="setup-kicker">FORNECEDOR PRINCIPAL</span><h2>Google Gemini</h2><p>Project ID: gen-lang-client-0918932208</p></div><span className={geminiKeySaved ? "setup-status connected" : "setup-status"}>{geminiKeySaved ? "Chave guardada neste PC" : "Configuração pendente"}</span></div>
             <label className="setup-field">Gemini API Key
               <input type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Cola aqui a tua chave secreta do Google AI Studio"/>
             </label>
             <div className="setup-actions">
-              <button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button>
+              {window.novaSecureStore && <button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button>}
               <button className="primary" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar ligação…" : "Testar ligação Gemini"}</button>
             </div>
             {geminiModels.length > 0 && <label className="setup-field">Modelo Gemini
               <select value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select>
             </label>}
-            <div className="setup-help"><Bot size={17}/><span>A chave é guardada localmente com encriptação do Electron/Windows. Não é incluída no instalador, nos commits nem no GitHub. No navegador, a chave só pode ser usada temporariamente nesta sessão.</span></div>
+            <div className="setup-help"><Bot size={17}/><span>No site web, a chave API é enviada por HTTPS ao endpoint seguro apenas quando fazes um pedido e não é guardada na aplicação. Fecha a sessão do navegador para limpar o campo. Na aplicação Windows, podes usar o armazenamento encriptado do Electron.</span></div>
           </div>
           <div className="setup-card secondary-setup">
             <h2>Outros fornecedores</h2><p>OpenAI e Anthropic podem ser configurados depois, no mesmo painel. As respetivas chaves também não devem ser colocadas no código-fonte.</p>
@@ -296,7 +326,7 @@ export default function App() {
         {["image","video","voice","assets"].includes(active) && <section className="tool-view"><span className="eyebrow">NOVA CREATIVE SUITE</span><h1>{modules.find(m => m.id === active)?.label || "Definições de IA"}</h1><p>Este módulo está previsto na arquitetura do NOVA AI STUDIO.</p><div className="feature-grid">{(active === "video" ? ["Texto para vídeo","Imagem para vídeo","Transformação de vídeo","Avatares realistas"] : active === "voice" ? ["Texto para voz","Clonagem autorizada de voz","Dobragem e tradução","Sincronização labial"] : active === "image" ? ["Imagem por prompt","Edição generativa","Personagens e cenários","Design publicitário"] : active === "assets" ? ["Projetos","Media importada","Modelos e presets","Exportações"] : ["OpenAI","Google Gemini","Anthropic","Mais fornecedores"]).map(item => <div className="feature-card" key={item}><Sparkles size={18}/><b>{item}</b><span>Em integração</span></div>)}</div><div className="notice"><Bot size={18}/><span>Este módulo ainda não executa gerações reais. Será ligado a fornecedores e serviços compatíveis após implementação e testes.</span></div></section>}
       </main>
     </div>
-    <footer className="statusbar"><span><span className="live-dot"/>{status}</span><span>Web + Windows Desktop · {clips.length} media no projeto</span></footer>
+    <footer className="statusbar"><span><span className="live-dot"/>{status}</span><span>Versão Web · {clips.length} ficheiro(s) nesta sessão</span></footer>
   </div>;
 }
 

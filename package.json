@@ -55,6 +55,10 @@
       "electron/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "dist-server/**/*",
+      "node_modules/**/*"
+    ],
     "win": {
       "target": [
         {
