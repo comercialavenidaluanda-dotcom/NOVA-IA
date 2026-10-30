@@ -3,7 +3,12 @@ import cors from "cors";
 
 const app = express();
 app.disable("x-powered-by");
-app.use(cors({ origin: (origin, callback) => {\n  if (!origin || origin === "null" || origin === "http://localhost:5173") return callback(null, true);\n  return callback(new Error("Origem não autorizada."));\n} }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || origin === "null" || origin === "http://localhost:5173") return callback(null, true);
+    return callback(new Error("Origem não autorizada."));
+  }
+}));
 app.use(express.json({ limit: "1mb" }));
 
 type Provider = "openai" | "google" | "anthropic";
@@ -58,4 +63,4 @@ app.post("/api/ai/chat", async (req, res) => {
 });
 
 const port = Number(process.env.PORT || 8787);
-app.listen(port, () => console.log("NOVA AI STUDIO API listening on " + port));
+app.listen(port, "127.0.0.1", () => console.log("NOVA AI STUDIO API listening on 127.0.0.1:" + port));
