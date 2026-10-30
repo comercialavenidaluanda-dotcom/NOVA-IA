@@ -26,7 +26,8 @@ export default function App() {
   const [status, setStatus] = useState("Pronto para criar");
   const [duration, setDuration] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);\n  const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const selectedClip = useMemo(() => clips.find(c => c.id === selected), [clips, selected]);
 
   function importFiles(files: FileList | null) {
