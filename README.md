@@ -10,6 +10,8 @@ Plataforma web e desktop para criação multimédia assistida por IA e desenvolv
 - Biblioteca de media e timeline inicial com pistas de vídeo e áudio.
 - Ajustes básicos por clip: ponto de entrada/saída, velocidade, volume e filtros visuais.
 - Operações iniciais de edição inspiradas em fluxos de editores como CapCut: dividir vídeo/áudio no cursor de reprodução, duplicar clips e reordenar clips dentro da respetiva pista.
+- Primeiro pipeline de renderização MP4 com FFmpeg no servidor local: exporta o vídeo selecionado com corte, velocidade, volume, filtros básicos, resolução 720p/1080p e 24/30/60 FPS.
+- O instalador Windows inclui o binário FFmpeg como recurso da aplicação.
 - Camada de título/legenda com texto, cor e tamanho configuráveis.
 - NOVA Build Studio com estrutura visual de projecto, painel de conversa multimodelo e áreas de pré-visualização/código em preparação.
 - NOVA Photo Lab com importação local, luminosidade, contraste, saturação, desfoque, rotação, espelhamento, cortes predefinidos e exportação PNG/JPEG.
@@ -17,7 +19,7 @@ Plataforma web e desktop para criação multimédia assistida por IA e desenvolv
 - GitHub Actions para compilar o instalador em Windows quando há alterações na branch main ou tags v*.
 
 ## Ainda em desenvolvimento
-Esta versão ainda não é uma plataforma equivalente ao Google AI Studio nem um editor profissional completo. O Build Studio tem a estrutura de interface, mas o agente ainda não cria/edita ficheiros automaticamente, não executa comandos e não mantém um preview vivo. O Photo Lab já aplica ajustes locais e exporta PNG/JPEG, mas ainda não tem camadas, máscaras, seleções avançadas, texto, retoque, RAW ou edição não destrutiva. O editor de vídeo já permite dividir clips de vídeo/áudio no cursor de reprodução, duplicar e reordenar clips por pista, além dos ajustes básicos. Ainda não tem renderização/exportação final, transições reais, keyframes, legendas automáticas, chroma key ou composição avançada. Geração de vídeo/imagem, avatares, lip-sync, voz, música e colaboração precisam de integrações e testes reais.
+Esta versão ainda não é uma plataforma equivalente ao Google AI Studio nem um editor profissional completo. O Build Studio tem a estrutura de interface, mas o agente ainda não cria/edita ficheiros automaticamente, não executa comandos e não mantém um preview vivo. O Photo Lab já aplica ajustes locais e exporta PNG/JPEG, mas ainda não tem camadas, máscaras, seleções avançadas, texto, retoque, RAW ou edição não destrutiva. O editor de vídeo já permite dividir clips de vídeo/áudio no cursor de reprodução, duplicar e reordenar clips por pista, além dos ajustes básicos. A renderização inicial exporta apenas o clip de vídeo selecionado; ainda não compõe automaticamente todos os clips da timeline num único filme. Continuam por implementar transições reais, keyframes, legendas automáticas, chroma key, mistura multipista e composição avançada. Geração de vídeo/imagem, avatares, lip-sync, voz, música e colaboração precisam de integrações e testes reais.
 
 ## Requisitos
 - Node.js 20+
@@ -30,7 +32,7 @@ npm install
 npm run dev
 ```
 
-A aplicação web abre em http://localhost:5173. A API local usa http://127.0.0.1:8787.
+A aplicação web abre em http://localhost:5173. A API local usa http://127.0.0.1:8787. O motor FFmpeg processa os vídeos localmente, sem os enviar para um fornecedor externo. A renderização inicial tem limite de 2 GB por ficheiro e 15 minutos por tarefa.
 
 ## Desktop
 ```bash
