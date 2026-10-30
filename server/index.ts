@@ -35,7 +35,8 @@ app.post("/api/ai/chat", async (req, res) => {
       body = { model, messages: [{ role: "user", content: prompt }], temperature: 0.7 };
     } else if (provider === "google") {
       const chosen = model;
-      url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(chosen) + ":generateContent";\n      headers["x-goog-api-key"] = apiKey;
+      url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(chosen) + ":generateContent";
+      headers["x-goog-api-key"] = apiKey;
       body = { contents: [{ parts: [{ text: prompt }] }] };
     } else {
       url = "https://api.anthropic.com/v1/messages";
