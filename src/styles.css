@@ -108,3 +108,9 @@
 .render-option select{min-width:82px;padding:9px 10px;border:1px solid #343b4a;border-radius:8px;background:#171c27;color:#f4f6fb;font:inherit;text-transform:none;letter-spacing:normal}
 .video-heading-actions button{white-space:nowrap}
 @media(max-width:850px){.video-heading-actions{justify-content:flex-start;width:100%}}
+
+
+.gemini-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--border,#303545);border-radius:10px;background:rgba(255,255,255,.025)}
+.gemini-tools span{font-size:12px;color:var(--muted,#9aa3b2)}
+.gemini-tools button{white-space:nowrap}
+@media(max-width:700px){.gemini-tools{align-items:stretch;flex-direction:column}.gemini-tools button{width:100%}}
