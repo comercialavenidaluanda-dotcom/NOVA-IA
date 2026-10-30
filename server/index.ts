@@ -108,6 +108,33 @@ app.post("/api/video/render", upload.single("file"), async (req, res) => {
   });
 });
 
+app.post("/api/ai/google/models", async (req, res) => {
+  const apiKey = safeText(req.body?.apiKey, 500);
+  if (!apiKey) return res.status(400).json({ error: "Gemini API Key em falta." });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+      headers: { "x-goog-api-key": apiKey }, signal: controller.signal
+    });
+    const data = await upstream.json() as any;
+    if (!upstream.ok) {
+      const message = data?.error?.message || "A Google recusou a chave API.";
+      return res.status(upstream.status).json({ error: String(message).slice(0, 500) });
+    }
+    const models = (Array.isArray(data?.models) ? data.models : [])
+      .filter((item: any) => Array.isArray(item.supportedGenerationMethods) && item.supportedGenerationMethods.includes("generateContent"))
+      .map((item: any) => ({ name: String(item.name || ""), displayName: String(item.displayName || item.name || "") }))
+      .filter((item: any) => item.name);
+    return res.json({ ok: true, models });
+  } catch (error) {
+    const message = error instanceof Error && error.name === "AbortError" ? "Tempo limite ao validar a chave Gemini." : "Não foi possível contactar a API Gemini.";
+    return res.status(502).json({ error: message });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 app.post("/api/ai/chat", async (req, res) => {
   const provider = req.body?.provider as Provider;
   const apiKey = safeText(req.body?.apiKey, 500);
