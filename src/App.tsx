@@ -23,6 +23,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState("");
   const [geminiModels, setGeminiModels] = useState<{ name: string; displayName?: string }[]>([]);
   const [testingGemini, setTestingGemini] = useState(false);
+  const [geminiKeySaved, setGeminiKeySaved] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
@@ -133,15 +134,28 @@ export default function App() {
     setStatus(direction < 0 ? "Clip movido para cima na sequência." : "Clip movido para baixo na sequência.");
   }
 
+  async function saveGeminiKey() {
+    if (!apiKey.trim()) { setStatus("Introduz a Gemini API Key antes de guardar."); return; }
+    if (!window.novaSecureStore) { setStatus("O armazenamento seguro está disponível na aplicação Windows, não no navegador."); return; }
+    try {
+      const result = await window.novaSecureStore.saveGeminiKey(apiKey.trim());
+      setGeminiKeySaved(Boolean(result?.saved));
+      setStatus(result?.saved ? "Chave Gemini guardada de forma encriptada neste computador." : "Não foi possível guardar a chave de forma segura.");
+    } catch {
+      setStatus("Falha ao guardar a chave Gemini de forma segura.");
+    }
+  }
+
   async function testGeminiConnection() {
-    if (!apiKey.trim()) { setStatus("Introduz a tua Gemini API Key para testar a ligação."); return; }
+    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
+    if (!activeKey) { setStatus("Introduz ou guarda a tua Gemini API Key para testar a ligação."); return; }
     setTestingGemini(true);
     setStatus("A validar a chave Gemini…");
     try {
       const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
       const response = await fetch(apiBase + "/api/ai/google/models", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey })
+        body: JSON.stringify({ apiKey: activeKey })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Não foi possível validar a chave Gemini.");
@@ -158,7 +172,8 @@ export default function App() {
   }
 
   async function askAI() {
-    if (!apiKey.trim() || !prompt.trim()) { setStatus("Introduz a chave API e o pedido."); return; }
+    const activeKey = apiKey.trim() || (provider === "google" && window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
+    if (!activeKey || !prompt.trim()) { setStatus("Introduz ou guarda a chave API e escreve o pedido."); return; }
     const chosenModel = model.trim() || (provider === "google" ? "gemini-2.5-flash" : "");
     if (!chosenModel) { setStatus("Indica o ID do modelo para este fornecedor."); return; }
     setBusy(true); setAnswer(""); setStatus("A contactar " + provider + "…");
@@ -166,7 +181,7 @@ export default function App() {
       const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
       const response = await fetch(apiBase + "/api/ai/chat", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, apiKey, model: chosenModel, prompt })
+        body: JSON.stringify({ provider, apiKey: activeKey, model: chosenModel, prompt })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Falha no fornecedor");
@@ -225,7 +240,7 @@ export default function App() {
                 {answer && <div className="assistant-response"><div className="response-author"><Bot size={15}/> Resposta do modelo</div><pre className="ai-answer">{answer}</pre><small>Esta versão recebe respostas de chat. Alteração automática de ficheiros, execução de comandos e testes do agente ainda não estão ligados.</small></div>}
               </div>
               <div className="build-composer">
-                <div className="composer-options"><label>Fornecedor <ProviderSelect provider={provider} setProvider={p => { setProvider(p); setModel(p === "google" ? "gemini-2.5-flash" : ""); }}/>{provider === "google" && geminiModels.length > 0 ? <select className="model-input" value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select> : <input className="model-input" value={model} onChange={e => setModel(e.target.value)} placeholder={provider === "google" ? "gemini-2.5-flash" : "ID do modelo"}/>}</label><label className="key-entry">Chave API <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={provider === "google" ? "Gemini API Key" : "Chave oficial do fornecedor"}/></label></div>{provider === "google" && <div className="gemini-tools"><span>Google AI · Modelos da tua chave</span><button className="outline" disabled={testingGemini || !apiKey.trim()} onClick={testGeminiConnection}>{testingGemini ? "A testar…" : "Testar ligação Gemini"}</button></div>}
+                <div className="composer-options"><label>Fornecedor <ProviderSelect provider={provider} setProvider={p => { setProvider(p); setModel(p === "google" ? "gemini-2.5-flash" : ""); }}/>{provider === "google" && geminiModels.length > 0 ? <select className="model-input" value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select> : <input className="model-input" value={model} onChange={e => setModel(e.target.value)} placeholder={provider === "google" ? "gemini-2.5-flash" : "ID do modelo"}/>}</label><label className="key-entry">Chave API <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={provider === "google" ? "Gemini API Key" : "Chave oficial do fornecedor"}/></label></div>{provider === "google" && <div className="gemini-tools"><span>{geminiKeySaved ? "Chave Gemini guardada neste computador" : "Google AI · chave não guardada"} · modelos da tua chave</span><div className="gemini-tool-actions"><button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button><button className="outline" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar…" : "Testar ligação Gemini"}</button></div></div>}
                 <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Descreve o que queres criar ou alterar neste projecto…"/>
                 <div className="composer-bottom"><span><MessageSquare size={13}/> As chaves são usadas apenas neste pedido</span><button className="primary" disabled={busy} onClick={askAI}><Sparkles size={15}/>{busy ? "A processar…" : "Executar pedido"}</button></div>
               </div>
