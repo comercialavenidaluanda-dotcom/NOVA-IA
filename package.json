@@ -8,7 +8,7 @@
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite --host 0.0.0.0",
     "dev:api": "tsx watch server/index.ts",
-    "build": "tsc --noEmit && esbuild server/index.ts --bundle --platform=node --format=cjs --outfile=dist-server/index.cjs --external:express --external:cors && vite build",
+    "build": "tsc --noEmit && esbuild server/index.ts --bundle --platform=node --format=cjs --outfile=dist-server/index.cjs --external:express --external:cors --external:multer --external:ffmpeg-static && vite build",
     "start:api": "node dist-server/index.cjs",
     "desktop": "concurrently -k \"npm:dev:web\" \"npm:dev:api\" \"wait-on http://localhost:5173 && electron electron/main.cjs\"",
     "dist:win": "npm run build && electron-builder --win nsis",
@@ -22,7 +22,9 @@
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "ffmpeg-static": "^5.2.0",
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -37,7 +39,8 @@
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
     "wait-on": "^8.0.1",
-    "esbuild": "^0.24.2"
+    "esbuild": "^0.24.2",
+    "@types/multer": "^2.0.0"
   },
   "build": {
     "appId": "ao.nova.aistudio",
@@ -67,6 +70,12 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "NOVA AI STUDIO"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "node_modules/ffmpeg-static/ffmpeg.exe",
+        "to": "ffmpeg.exe"
+      }
+    ]
   }
 }
