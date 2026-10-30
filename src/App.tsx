@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Aperture, AudioLines, Bot, Code2, Copy, Download, Film, FolderOpen, ImagePlus, Layers3, Mic2, MonitorPlay, Plus, Scissors, Settings2, Sparkles, Upload, WandSparkles, RotateCcw, RotateCw, FlipHorizontal, SlidersHorizontal, Eye, Files, TerminalSquare, MessageSquare, Image as ImageIcon, ChevronUp, ChevronDown } from "lucide-react";
+import { Aperture, AudioLines, Bot, Code2, Copy, Download, Film, FolderOpen, ImagePlus, Layers3, Mic2, MonitorPlay, Plus, Scissors, Settings2, Sparkles, Upload, WandSparkles, RotateCcw, RotateCw, FlipHorizontal, SlidersHorizontal, Eye, Files, TerminalSquare, MessageSquare, Image as ImageIcon, ChevronUp, ChevronDown, CircleHelp } from "lucide-react";
 
 type Clip = { id: string; name: string; url: string; file?: File; kind: string; duration: number; trimStart: number; trimEnd: number; volume: number; speed: number; effect: string };
 type Provider = "openai" | "google" | "anthropic";
@@ -12,7 +12,8 @@ const modules = [
   { id: "video", label: "Vídeo IA", icon: WandSparkles },
   { id: "voice", label: "Estúdio de voz", icon: Mic2 },
   { id: "assets", label: "Biblioteca", icon: FolderOpen },
-  { id: "settings", label: "Configurar IA", icon: Settings2 }
+  { id: "settings", label: "Configurar IA", icon: Settings2 },
+  { id: "help", label: "Ajuda e primeiros passos", icon: CircleHelp }
 ];
 
 export default function App() {
@@ -46,7 +47,6 @@ export default function App() {
     window.novaSecureStore?.hasGeminiKey().then(saved => {
       if (!mounted) return;
       setGeminiKeySaved(saved);
-      if (!saved) setActive("settings");
     }).catch(() => { if (mounted) setGeminiKeySaved(false); });
     return () => { mounted = false; };
   }, []);
@@ -210,7 +210,7 @@ export default function App() {
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Aperture size={22}/></div><div><strong>NOVA <span>AI</span> STUDIO</strong><small>CREATE WITHOUT LIMITS</small></div></div>
       <div className="project-name"><span className="live-dot"/> Projeto sem título <span className="saved">● Local</span></div>
-      <div className="top-actions"><button className="ghost" onClick={() => setActive("settings")}><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
+      <div className="top-actions"><button className="ghost" onClick={() => setActive("help")}><CircleHelp size={16}/> Ajuda</button><button className="ghost" onClick={() => setActive("settings")}><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
     </header>
     <div className="workspace">
       <aside className="sidebar">
@@ -267,6 +267,7 @@ export default function App() {
             </aside>
           </div>
         </section>}
+{active === "help" && <section className="tool-view help-view"><span className="eyebrow">CENTRO DE AJUDA · NOVA AI STUDIO</span><h1>Como começar</h1><p>Escolhe uma área para abrir. As funções em integração estão identificadas para não confundir demonstrações com ferramentas já operacionais.</p><div className="help-grid"><button className="help-card" onClick={() => setActive("developer")}><Code2/><b>Build Studio</b><span>Conversa com os modelos de IA e envia pedidos técnicos. A execução automática de código ainda está em desenvolvimento.</span><em>Abrir Build Studio →</em></button><button className="help-card" onClick={() => setActive("editor")}><Film/><b>Editor de vídeo</b><span>Importa media, seleciona um clip, ajusta os parâmetros e renderiza o vídeo selecionado.</span><em>Abrir editor →</em></button><button className="help-card" onClick={() => setActive("photo-editor")}><ImageIcon/><b>Editor de fotografias</b><span>Abre uma imagem, ajusta luz, contraste, saturação, corte e exporta em PNG ou JPEG.</span><em>Abrir Photo Lab →</em></button><button className="help-card" onClick={() => setActive("settings")}><Settings2/><b>Configurar fornecedores</b><span>Introduz a chave do fornecedor no campo próprio. No navegador, usa-a apenas durante a sessão; o armazenamento encriptado requer a aplicação Windows.</span><em>Abrir configurações →</em></button></div><div className="help-note"><CircleHelp size={18}/><span>Nota: Geração de imagem, Vídeo IA, Estúdio de voz, Biblioteca e agente autónomo ainda estão em integração. Os respetivos ecrãs não representam funções concluídas.</span></div></section>}
 {active === "settings" && <section className="tool-view setup-view">
           <span className="eyebrow">PRIMEIRO ARRANQUE · CONFIGURAÇÃO LOCAL</span>
           <h1>Configuração do NOVA AI STUDIO</h1>
