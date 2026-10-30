@@ -27,11 +27,46 @@ ipcMain.handle("nova:gemini:has", async () => {
   } catch { return false; }
 });
 function startBundledApi() {
-  const apiPath = path.join(__dirname, "../dist-server/index.cjs");
+  const resourcesPath = process.resourcesPath;
+  const unpackedRoot = path.join(resourcesPath, "app.asar.unpacked");
+  const apiPath = path.join(unpackedRoot, "dist-server", "index.cjs");
+  const ffmpegPath = path.join(resourcesPath, "ffmpeg.exe");
+
   apiProcess = fork(apiPath, [], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", PORT: "8787", NODE_ENV: "production" },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      NODE_ENV: "production",
+      PORT: "8787",
+      NODE_PATH: path.join(unpackedRoot, "node_modules"),
+      NOVA_FFMPEG_PATH: ffmpegPath
+    },
     stdio: "ignore"
   });
+  apiProcess.on("error", error => console.error("[NOVA API] Falha ao iniciar:", error));
+  apiProcess.on("exit", (code, signal) => {
+    if (code !== 0 && code !== null) console.error("[NOVA API] Processo terminou:", code, signal);
+  });
+}
+
+async function waitForBundledApi(timeoutMs = 20000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (apiProcess?.exitCode !== null && apiProcess?.exitCode !== undefined) {
+      throw new Error("A API local terminou antes de ficar pronta.");
+    }
+    try {
+      const response = await fetch("http://127.0.0.1:8787/api/health", {
+        signal: AbortSignal.timeout(1200)
+      });
+      if (response.ok) {
+        const health = await response.json();
+        if (health?.ok === true) return;
+      }
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+  throw new Error("A API local não ficou pronta dentro do tempo esperado.");
 }
 function createWindow() {
   const win = new BrowserWindow({
@@ -43,8 +78,15 @@ function createWindow() {
   if (isDev) win.loadURL("http://localhost:5173");
   else win.loadFile(path.join(__dirname, "../dist/index.html"));
 }
-app.whenReady().then(() => {
-  if (!isDev) startBundledApi();
+app.whenReady().then(async () => {
+  if (!isDev) {
+    startBundledApi();
+    try {
+      await waitForBundledApi();
+    } catch (error) {
+      console.error("[NOVA AI STUDIO] API local indisponível:", error);
+    }
+  }
   createWindow();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
