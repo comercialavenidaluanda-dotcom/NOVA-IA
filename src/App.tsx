@@ -302,7 +302,7 @@ export default function App() {
           <h1>Configuração do NOVA AI STUDIO</h1>
           <p>Configura os fornecedores de inteligência artificial neste computador. Não precisas de criar GitHub Secrets para usar a tua Gemini API Key.</p>
           <div className="setup-card">
-            <div className="setup-card-heading"><div><span className="setup-kicker">FORNECEDOR PRINCIPAL</span><h2>Google Gemini</h2><p>Project ID: 655392085298</p></div><span className={geminiKeySaved ? "setup-status connected" : "setup-status"}>{geminiKeySaved ? "Chave guardada neste PC" : "Configuração pendente"}</span></div>
+            <div className="setup-card-heading"><div><span className="setup-kicker">FORNECEDOR PRINCIPAL</span><h2>Google Gemini</h2><p>Project ID: gen-lang-client-0918932208</p></div><span className={geminiKeySaved ? "setup-status connected" : "setup-status"}>{geminiKeySaved ? "Chave guardada neste PC" : "Configuração pendente"}</span></div>
             <label className="setup-field">Gemini API Key
               <input type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Cola aqui a tua chave secreta do Google AI Studio"/>
             </label>
