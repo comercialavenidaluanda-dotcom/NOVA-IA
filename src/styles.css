@@ -253,3 +253,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .help-card em{margin-top:auto;font-size:11px;font-style:normal;font-weight:700;color:#df5634}
 .help-note{display:flex;gap:12px;align-items:flex-start;margin-top:18px;padding:14px 16px;border:1px solid #f1dfb6;border-radius:10px;background:#fff9eb;color:#8a5a12;font-size:12px;line-height:1.6}
 @media(max-width:650px){.help-grid{grid-template-columns:1fr}}
+
+
+/* Keep primary navigation above workspace content and clickable */
+.topbar,.sidebar{position:relative;z-index:30}
+.topbar button,.sidebar button{position:relative;z-index:31;pointer-events:auto}
