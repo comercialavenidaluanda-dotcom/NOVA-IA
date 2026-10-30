@@ -165,21 +165,28 @@ export default function App() {
   }
 
   async function testGeminiConnection() {
-    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
-    if (!activeKey) { setStatus("Introduz ou guarda a tua Gemini API Key para testar a ligação."); return; }
+    if (testingGemini) return;
     setTestingGemini(true);
-    setStatus("A validar a chave Gemini…");
+    setStatus("A preparar teste de ligação Gemini…");
     try {
+      const activeKey = apiKey.trim() || (window.novaSecureStore
+        ? await window.novaSecureStore.getGeminiKey()
+        : "");
+      if (!activeKey) throw new Error("Introduz a Gemini API Key antes de testar a ligação.");
+
+      setStatus("A validar a chave Gemini com o Google…");
       const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
       const response = await fetch(apiBase + "/api/ai/google/models", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: activeKey })
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Não foi possível validar a chave Gemini.");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível validar a chave Gemini (" + response.status + ").");
       const available = Array.isArray(data.models) ? data.models : [];
+      if (!available.length) throw new Error("A chave foi aceite, mas o Google não devolveu modelos compatíveis.");
       setGeminiModels(available);
-      const preferred = available.find((item: { name: string }) => item.name === "gemini-2.5-flash")?.name || available[0]?.name || "gemini-2.5-flash";
+      const preferred = available.find((item: { name: string }) => item.name === "models/gemini-2.5-flash")?.name || available[0]?.name || "gemini-2.5-flash";
       setModel(preferred.replace(/^models\//, ""));
       setStatus("Gemini ligado. " + available.length + " modelo(s) compatível(is) encontrado(s).");
     } catch (error) {
