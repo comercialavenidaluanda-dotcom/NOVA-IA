@@ -91,3 +91,12 @@
 @media(max-width:1200px){.build-layout{grid-template-columns:155px minmax(300px,1fr)}.build-preview{display:none}}
 @media(max-width:850px){.build-layout{grid-template-columns:1fr}.build-projects{display:none}.photo-workspace{grid-template-columns:1fr}.photo-tools{display:grid;grid-template-columns:1fr 1fr}.photo-tool-title{grid-column:1/-1}.photo-canvas-wrap{min-height:360px}}
 @media(max-width:620px){.build-heading,.photo-heading{align-items:flex-start;flex-direction:column}.build-heading h1,.photo-heading h1{font-size:21px}.build-studio,.photo-studio{margin:0}.build-layout{min-height:720px}.build-chat{min-height:650px}.composer-options .key-entry{margin-left:0}.photo-tools{grid-template-columns:1fr}.photo-tool-title{grid-column:auto}.photo-heading-actions{width:100%}.photo-canvas-wrap{padding:12px;min-height:300px}}
+
+
+/* CapCut-inspired editing controls */
+.clip-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px;border-top:1px solid #292f3b}
+.clip-actions .outline,.timeline-actions .outline{padding:7px 9px;font-size:9px;white-space:nowrap}
+.clip-actions .outline{min-width:0}
+.timeline-actions{display:flex;align-items:center;gap:6px}
+.timeline-actions button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:620px){.timeline-actions{gap:4px}.timeline-actions .outline{padding:7px;font-size:8px}}
