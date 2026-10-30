@@ -5,26 +5,57 @@ const path = require("node:path");
 const isDev = !app.isPackaged;
 let apiProcess;
 const secretFile = () => path.join(app.getPath("userData"), "nova-secure-settings.json");
-ipcMain.handle("nova:gemini:save", async (_event, key) => {
-  if (typeof key !== "string" || !key.trim()) return { saved: false };
+const allowedProviders = new Set(["google", "openai", "anthropic"]);
+async function readSecureSettings() {
+  try { return JSON.parse(await fs.readFile(secretFile(), "utf8")); } catch { return {}; }
+}
+async function saveProviderKey(provider, key) {
+  if (!allowedProviders.has(provider) || typeof key !== "string" || !key.trim() || key.length > 500) return { saved: false, reason: "invalid-input" };
   if (!safeStorage.isEncryptionAvailable()) return { saved: false, reason: "secure-storage-unavailable" };
-  const encrypted = safeStorage.encryptString(key.trim()).toString("base64");
+  const settings = await readSecureSettings();
+  settings.apiKeys = settings.apiKeys && typeof settings.apiKeys === "object" ? settings.apiKeys : {};
+  settings.apiKeys[provider] = safeStorage.encryptString(key.trim()).toString("base64");
+  // Migrate the previous Gemini-only setting without exposing plaintext.
+  delete settings.geminiApiKey;
   await fs.mkdir(app.getPath("userData"), { recursive: true });
-  await fs.writeFile(secretFile(), JSON.stringify({ geminiApiKey: encrypted }), { mode: 0o600 });
+  await fs.writeFile(secretFile(), JSON.stringify(settings), { mode: 0o600 });
   return { saved: true };
+}
+ipcMain.handle("nova:keys:save", async (_event, provider, key) => saveProviderKey(provider, key));
+ipcMain.handle("nova:keys:get", async (_event, provider) => {
+  try {
+    if (!allowedProviders.has(provider) || !safeStorage.isEncryptionAvailable()) return "";
+    const settings = await readSecureSettings();
+    const encrypted = settings.apiKeys?.[provider] || (provider === "google" ? settings.geminiApiKey : "");
+    return encrypted ? safeStorage.decryptString(Buffer.from(encrypted, "base64")) : "";
+  } catch { return ""; }
 });
+ipcMain.handle("nova:keys:has", async (_event, provider) => {
+  if (!allowedProviders.has(provider)) return false;
+  const settings = await readSecureSettings();
+  return Boolean(settings.apiKeys?.[provider] || (provider === "google" && settings.geminiApiKey));
+});
+ipcMain.handle("nova:keys:delete", async (_event, provider) => {
+  if (!allowedProviders.has(provider)) return { deleted: false };
+  const settings = await readSecureSettings();
+  if (settings.apiKeys) delete settings.apiKeys[provider];
+  if (provider === "google") delete settings.geminiApiKey;
+  await fs.writeFile(secretFile(), JSON.stringify(settings), { mode: 0o600 });
+  return { deleted: true };
+});
+// Backward-compatible Gemini IPC aliases for older renderer builds.
+ipcMain.handle("nova:gemini:save", async (_event, key) => saveProviderKey("google", key));
 ipcMain.handle("nova:gemini:get", async () => {
   try {
     if (!safeStorage.isEncryptionAvailable()) return "";
-    const saved = JSON.parse(await fs.readFile(secretFile(), "utf8"));
-    return saved.geminiApiKey ? safeStorage.decryptString(Buffer.from(saved.geminiApiKey, "base64")) : "";
+    const settings = await readSecureSettings();
+    const encrypted = settings.apiKeys?.google || settings.geminiApiKey;
+    return encrypted ? safeStorage.decryptString(Buffer.from(encrypted, "base64")) : "";
   } catch { return ""; }
 });
 ipcMain.handle("nova:gemini:has", async () => {
-  try {
-    const saved = JSON.parse(await fs.readFile(secretFile(), "utf8"));
-    return Boolean(saved.geminiApiKey);
-  } catch { return false; }
+  const settings = await readSecureSettings();
+  return Boolean(settings.apiKeys?.google || settings.geminiApiKey);
 });
 function startBundledApi() {
   const apiPath = path.join(__dirname, "../dist-server/index.cjs");

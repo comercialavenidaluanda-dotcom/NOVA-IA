@@ -24,7 +24,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState("");
   const [geminiModels, setGeminiModels] = useState<{ name: string; displayName?: string }[]>([]);
   const [testingGemini, setTestingGemini] = useState(false);
-  const [geminiKeySaved, setGeminiKeySaved] = useState(false);
+  const [savedProviders, setSavedProviders] = useState<Record<Provider, boolean>>({ openai: false, google: false, anthropic: false });
   const [prompt, setPrompt] = useState("");
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,11 +43,20 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
-    window.novaSecureStore?.hasGeminiKey().then(saved => {
-      if (!mounted) return;
-      setGeminiKeySaved(saved);
-      if (!saved) setActive("settings");
-    }).catch(() => { if (mounted) setGeminiKeySaved(false); });
+    const loadSavedProviders = async () => {
+      if (!window.novaSecureStore) { if (mounted) setActive("settings"); return; }
+      try {
+        const [google, openai, anthropic] = await Promise.all([
+          window.novaSecureStore.hasApiKey("google"),
+          window.novaSecureStore.hasApiKey("openai"),
+          window.novaSecureStore.hasApiKey("anthropic")
+        ]);
+        if (!mounted) return;
+        setSavedProviders({ google, openai, anthropic });
+        if (!google && !openai && !anthropic) setActive("settings");
+      } catch { if (mounted) setActive("settings"); }
+    };
+    loadSavedProviders();
     return () => { mounted = false; };
   }, []);
 
@@ -148,20 +157,44 @@ export default function App() {
     setStatus(direction < 0 ? "Clip movido para cima na sequência." : "Clip movido para baixo na sequência.");
   }
 
-  async function saveGeminiKey() {
-    if (!apiKey.trim()) { setStatus("Introduz a Gemini API Key antes de guardar."); return; }
+  async function saveProviderKey() {
+    if (!apiKey.trim()) { setStatus("Introduz a chave API antes de guardar."); return; }
     if (!window.novaSecureStore) { setStatus("O armazenamento seguro está disponível na aplicação Windows, não no navegador."); return; }
     try {
-      const result = await window.novaSecureStore.saveGeminiKey(apiKey.trim());
-      setGeminiKeySaved(Boolean(result?.saved));
-      setStatus(result?.saved ? "Chave Gemini guardada de forma encriptada neste computador." : "Não foi possível guardar a chave de forma segura.");
+      const result = await window.novaSecureStore.saveApiKey(provider, apiKey.trim());
+      if (result?.saved) {
+        setSavedProviders(old => ({ ...old, [provider]: true }));
+        setApiKey("");
+      }
+      setStatus(result?.saved ? "Chave " + provider + " guardada de forma encriptada neste computador." : "Não foi possível guardar a chave de forma segura.");
     } catch {
-      setStatus("Falha ao guardar a chave Gemini de forma segura.");
+      setStatus("Falha ao guardar a chave de forma segura.");
     }
   }
 
+  async function testSelectedProvider() {
+    if (provider === "google") { await testGeminiConnection(); return; }
+    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getApiKey(provider) : "");
+    const chosenModel = model.trim() || (provider === "openai" ? "gpt-4o-mini" : "claude-3-5-haiku-20241022");
+    if (!activeKey) { setStatus("Introduz ou guarda a chave API deste fornecedor."); return; }
+    setTestingGemini(true);
+    setStatus("A testar ligação " + provider + "…");
+    try {
+      const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
+      const response = await fetch(apiBase + "/api/ai/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, apiKey: activeKey, model: chosenModel, prompt: "Responde apenas com OK." })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Não foi possível validar a ligação.");
+      setStatus("Ligação " + provider + " confirmada. Modelo: " + chosenModel + ".");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Erro ao testar fornecedor.");
+    } finally { setTestingGemini(false); }
+  }
+
   async function testGeminiConnection() {
-    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
+    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getApiKey("google") : "");
     if (!activeKey) { setStatus("Introduz ou guarda a tua Gemini API Key para testar a ligação."); return; }
     setTestingGemini(true);
     setStatus("A validar a chave Gemini…");
@@ -186,7 +219,7 @@ export default function App() {
   }
 
   async function askAI() {
-    const activeKey = apiKey.trim() || (provider === "google" && window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
+    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getApiKey(provider) : "");
     if (!activeKey || !prompt.trim()) { setStatus("Introduz ou guarda a chave API e escreve o pedido."); return; }
     const chosenModel = model.trim() || (provider === "google" ? "gemini-2.5-flash" : "");
     if (!chosenModel) { setStatus("Indica o ID do modelo para este fornecedor."); return; }
@@ -254,7 +287,7 @@ export default function App() {
                 {answer && <div className="assistant-response"><div className="response-author"><Bot size={15}/> Resposta do modelo</div><pre className="ai-answer">{answer}</pre><small>Esta versão recebe respostas de chat. Alteração automática de ficheiros, execução de comandos e testes do agente ainda não estão ligados.</small></div>}
               </div>
               <div className="build-composer">
-                <div className="composer-options"><label>Fornecedor <ProviderSelect provider={provider} setProvider={p => { setProvider(p); setModel(p === "google" ? "gemini-2.5-flash" : ""); }}/>{provider === "google" && geminiModels.length > 0 ? <select className="model-input" value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select> : <input className="model-input" value={model} onChange={e => setModel(e.target.value)} placeholder={provider === "google" ? "gemini-2.5-flash" : "ID do modelo"}/>}</label><label className="key-entry">Chave API <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={provider === "google" ? "Gemini API Key" : "Chave oficial do fornecedor"}/></label></div>{provider === "google" && <div className="gemini-tools"><span>{geminiKeySaved ? "Chave Gemini guardada neste computador" : "Google AI · chave não guardada"} · modelos da tua chave</span><div className="gemini-tool-actions"><button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button><button className="outline" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar…" : "Testar ligação Gemini"}</button></div></div>}
+                <div className="composer-options"><label>Fornecedor <ProviderSelect provider={provider} setProvider={p => { setProvider(p); setModel(p === "google" ? "gemini-2.5-flash" : ""); }}/>{provider === "google" && geminiModels.length > 0 ? <select className="model-input" value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select> : <input className="model-input" value={model} onChange={e => setModel(e.target.value)} placeholder={provider === "google" ? "gemini-2.5-flash" : "ID do modelo"}/>}</label><label className="key-entry">Chave API <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={provider === "google" ? "Gemini API Key" : "Chave oficial do fornecedor"}/></label></div><div className="gemini-tools"><span>{savedProviders[provider] ? "Chave " + provider + " guardada neste computador" : "Chave " + provider + " ainda não guardada"}</span><div className="gemini-tool-actions"><button className="outline" disabled={!apiKey.trim()} onClick={saveProviderKey}>Guardar chave encriptada</button><button className="outline" disabled={testingGemini || (!apiKey.trim() && !savedProviders[provider])} onClick={testSelectedProvider}>{testingGemini ? "A testar…" : "Testar ligação"}</button></div></div>
                 <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Descreve o que queres criar ou alterar neste projecto…"/>
                 <div className="composer-bottom"><span><MessageSquare size={13}/> As chaves são usadas apenas neste pedido</span><button className="primary" disabled={busy} onClick={askAI}><Sparkles size={15}/>{busy ? "A processar…" : "Executar pedido"}</button></div>
               </div>
@@ -268,27 +301,35 @@ export default function App() {
           </div>
         </section>}
 {active === "settings" && <section className="tool-view setup-view">
-          <span className="eyebrow">PRIMEIRO ARRANQUE · CONFIGURAÇÃO LOCAL</span>
-          <h1>Configuração do NOVA AI STUDIO</h1>
-          <p>Configura os fornecedores de inteligência artificial neste computador. Não precisas de criar GitHub Secrets para usar a tua Gemini API Key.</p>
+          <span className="eyebrow">CONFIGURAÇÃO LOCAL · CHAVES ENCRIPTADAS</span>
+          <h1>Configuração dos fornecedores de IA</h1>
+          <p>Guarda as tuas próprias chaves neste computador. As credenciais são protegidas pelo armazenamento seguro do Windows/Electron e não são incluídas no instalador nem no GitHub.</p>
           <div className="setup-card">
-            <div className="setup-card-heading"><div><span className="setup-kicker">FORNECEDOR PRINCIPAL</span><h2>Google Gemini</h2><p>Project ID: 655392085298</p></div><span className={geminiKeySaved ? "setup-status connected" : "setup-status"}>{geminiKeySaved ? "Chave guardada neste PC" : "Configuração pendente"}</span></div>
-            <label className="setup-field">Gemini API Key
-              <input type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Cola aqui a tua chave secreta do Google AI Studio"/>
+            <div className="setup-card-heading"><div><span className="setup-kicker">FORNECEDORES SUPORTADOS</span><h2>Contas de IA</h2><p>Google Gemini · OpenAI · Anthropic Claude</p></div><span className="setup-status connected">{Object.values(savedProviders).filter(Boolean).length}/3 configurados</span></div>
+            <label className="setup-field">Fornecedor
+              <select value={provider} onChange={e => { const next = e.target.value as Provider; setProvider(next); setApiKey(""); setModel(next === "google" ? "gemini-2.5-flash" : next === "openai" ? "gpt-4o-mini" : "claude-3-5-haiku-20241022"); }}>
+                <option value="google">Google Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic Claude</option>
+              </select>
+            </label>
+            <div className="setup-provider-row"><span>Estado de {provider}</span><span>{savedProviders[provider] ? "Chave guardada neste PC" : "Configuração pendente"}</span></div>
+            <label className="setup-field">{provider === "google" ? "Gemini API Key" : provider === "openai" ? "OpenAI API Key" : "Anthropic API Key"}
+              <input type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Cola aqui a chave API oficial"/>
+            </label>
+            <label className="setup-field">Modelo padrão
+              <input value={model} onChange={e => setModel(e.target.value)} placeholder="ID do modelo"/>
             </label>
             <div className="setup-actions">
-              <button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button>
-              <button className="primary" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar ligação…" : "Testar ligação Gemini"}</button>
+              <button className="outline" disabled={!apiKey.trim()} onClick={saveProviderKey}>Guardar chave encriptada</button>
+              <button className="primary" disabled={testingGemini || (!apiKey.trim() && !savedProviders[provider])} onClick={testSelectedProvider}>{testingGemini ? "A testar ligação…" : "Testar ligação"}</button>
             </div>
-            {geminiModels.length > 0 && <label className="setup-field">Modelo Gemini
+            {provider === "google" && geminiModels.length > 0 && <label className="setup-field">Modelos Gemini disponíveis
               <select value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select>
             </label>}
-            <div className="setup-help"><Bot size={17}/><span>A chave é guardada localmente com encriptação do Electron/Windows. Não é incluída no instalador, nos commits nem no GitHub. No navegador, a chave só pode ser usada temporariamente nesta sessão.</span></div>
+            <div className="setup-help"><Bot size={17}/><span>As chaves são encriptadas localmente com Electron Safe Storage. Não coloques chaves nos ficheiros do projeto, commits ou artefactos de instalação. No navegador, o armazenamento seguro não está disponível.</span></div>
           </div>
           <div className="setup-card secondary-setup">
-            <h2>Outros fornecedores</h2><p>OpenAI e Anthropic podem ser configurados depois, no mesmo painel. As respetivas chaves também não devem ser colocadas no código-fonte.</p>
-            <div className="setup-provider-row"><span>OpenAI</span><span>Disponível para configurar</span></div>
-            <div className="setup-provider-row"><span>Anthropic</span><span>Disponível para configurar</span></div>
+            <h2>Estado das integrações</h2>
+            {(["google", "openai", "anthropic"] as Provider[]).map(item => <div className="setup-provider-row" key={item}><span>{item === "google" ? "Google Gemini" : item === "openai" ? "OpenAI" : "Anthropic Claude"}</span><span>{savedProviders[item] ? "Configurado neste PC" : "A aguardar chave"}</span></div>)}
           </div>
           <div className="setup-footer"><span>{status}</span><button className="ghost" onClick={() => setActive("developer")}>Abrir NOVA Build Studio</button></div>
         </section>}
