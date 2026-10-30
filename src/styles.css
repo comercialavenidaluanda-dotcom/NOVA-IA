@@ -100,3 +100,11 @@
 .timeline-actions{display:flex;align-items:center;gap:6px}
 .timeline-actions button:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:620px){.timeline-actions{gap:4px}.timeline-actions .outline{padding:7px;font-size:8px}}
+
+
+/* NOVA FFmpeg render controls */
+.video-heading-actions{display:flex;align-items:end;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.render-option{display:grid;gap:5px;color:#aab2c2;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+.render-option select{min-width:82px;padding:9px 10px;border:1px solid #343b4a;border-radius:8px;background:#171c27;color:#f4f6fb;font:inherit;text-transform:none;letter-spacing:normal}
+.video-heading-actions button{white-space:nowrap}
+@media(max-width:850px){.video-heading-actions{justify-content:flex-start;width:100%}}
