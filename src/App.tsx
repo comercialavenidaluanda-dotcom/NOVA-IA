@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Aperture, AudioLines, Bot, Code2, Copy, Download, Film, FolderOpen, ImagePlus, Layers3, Mic2, MonitorPlay, Plus, Scissors, Settings2, Sparkles, Upload, WandSparkles, RotateCcw, RotateCw, FlipHorizontal, SlidersHorizontal, Eye, Files, TerminalSquare, MessageSquare, Image as ImageIcon, ChevronUp, ChevronDown } from "lucide-react";
 
-type Clip = { id: string; name: string; url: string; kind: string; duration: number; trimStart: number; trimEnd: number; volume: number; speed: number; effect: string };
+type Clip = { id: string; name: string; url: string; file?: File; kind: string; duration: number; trimStart: number; trimEnd: number; volume: number; speed: number; effect: string };
 type Provider = "openai" | "google" | "anthropic";
 
 const modules = [
@@ -25,7 +25,7 @@ export default function App() {
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Pronto para criar");
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(0);\n  const [rendering, setRendering] = useState(false);\n  const [renderResolution, setRenderResolution] = useState("1080");\n  const [renderFps, setRenderFps] = useState("30");
   const [titleText, setTitleText] = useState("");
   const [titleColor, setTitleColor] = useState("#ffffff");
   const [titleSize, setTitleSize] = useState(34);
@@ -38,7 +38,7 @@ export default function App() {
     if (!files) return;
     const added = Array.from(files).map(file => {
       const url = URL.createObjectURL(file);
-      return { id: crypto.randomUUID(), name: file.name, url, kind: file.type.startsWith("video") ? "video" : file.type.startsWith("audio") ? "audio" : "image", duration: 12, trimStart: 0, trimEnd: 12, volume: 1, speed: 1, effect: "none" };
+      return { id: crypto.randomUUID(), name: file.name, url, file, kind: file.type.startsWith("video") ? "video" : file.type.startsWith("audio") ? "audio" : "image", duration: 12, trimStart: 0, trimEnd: 12, volume: 1, speed: 1, effect: "none" };
     });
     setClips(old => [...old, ...added]);
     if (added[0]) setSelected(added[0].id);
@@ -46,6 +46,46 @@ export default function App() {
   }
 
   function patchClip(id: string, patch: Partial<Clip>) { setClips(old => old.map(c => c.id === id ? { ...c, ...patch } : c)); }
+  async function exportSelectedVideo() {
+    if (!selectedClip || selectedClip.kind !== "video" || !selectedClip.file) {
+      setStatus("Seleciona um vídeo importado nesta sessão para renderizar.");
+      return;
+    }
+    setRendering(true);
+    setStatus("A preparar renderização FFmpeg…");
+    try {
+      const form = new FormData();
+      form.append("file", selectedClip.file, selectedClip.name);
+      form.append("trimStart", String(selectedClip.trimStart));
+      form.append("trimEnd", String(selectedClip.trimEnd));
+      form.append("speed", String(selectedClip.speed));
+      form.append("volume", String(selectedClip.volume));
+      form.append("effect", selectedClip.effect);
+      form.append("resolution", renderResolution);
+      form.append("fps", renderFps);
+      const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
+      const response = await fetch(apiBase + "/api/video/render", { method: "POST", body: form });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Não foi possível renderizar o vídeo.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = selectedClip.name.replace(/\\.[^.]+$/, "") + "-nova.mp4";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setStatus("Renderização MP4 concluída.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Erro durante a renderização.");
+    } finally {
+      setRendering(false);
+    }
+  }
+
 
   function splitSelectedClip() {
     if (!selectedClip || selectedClip.kind === "image") {
@@ -123,7 +163,7 @@ export default function App() {
       </aside>
       <main className="main">
         {active === "editor" && <section className="editor-view">
-          <div className="section-heading"><div><span className="eyebrow">POST-PRODUÇÃO</span><h1>Editor de vídeo</h1><p>Organiza os teus conteúdos numa linha temporal multipista.</p></div><button className="outline" onClick={() => fileRef.current?.click()}><Upload size={16}/> Importar media</button><input ref={fileRef} type="file" accept="video/*,audio/*,image/*" multiple hidden onChange={e => importFiles(e.target.files)}/></div>
+          <div className="section-heading"><div><span className="eyebrow">POST-PRODUÇÃO · FFmpeg</span><h1>Editor de vídeo</h1><p>Organiza, ajusta e renderiza o clip selecionado em MP4.</p></div><div className="video-heading-actions"><label className="render-option">Resolução<select value={renderResolution} onChange={e => setRenderResolution(e.target.value)}><option value="720">720p</option><option value="1080">1080p</option></select></label><label className="render-option">FPS<select value={renderFps} onChange={e => setRenderFps(e.target.value)}><option value="24">24</option><option value="30">30</option><option value="60">60</option></select></label><button className="outline" onClick={() => fileRef.current?.click()}><Upload size={16}/> Importar media</button><button className="primary" disabled={rendering || selectedClip?.kind !== "video"} onClick={exportSelectedVideo}><Download size={15}/>{rendering ? "A renderizar…" : "Renderizar MP4"}</button></div><input ref={fileRef} type="file" accept="video/*,audio/*,image/*" multiple hidden onChange={e => importFiles(e.target.files)}/></div>
           <div className="editor-grid">
             <div className="preview-panel">
               <div className="panel-top"><span><MonitorPlay size={15}/> PRÉ-VISUALIZAÇÃO</span><span>16:9 · 1080p</span></div>
