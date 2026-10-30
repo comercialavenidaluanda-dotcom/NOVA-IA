@@ -80,8 +80,8 @@ function createWindow() {
 }
 app.whenReady().then(async () => {
   if (!isDev) {
-    startBundledApi();
     try {
+      startBundledApi();
       await waitForBundledApi();
     } catch (error) {
       console.error("[NOVA AI STUDIO] API local indisponível:", error);
