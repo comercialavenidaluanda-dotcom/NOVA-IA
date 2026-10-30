@@ -37,6 +37,10 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const selectedClip = useMemo(() => clips.find(c => c.id === selected), [clips, selected]);
 
+  useEffect(() => {
+    window.novaSecureStore?.hasGeminiKey().then(setGeminiKeySaved).catch(() => setGeminiKeySaved(false));
+  }, []);
+
   function importFiles(files: FileList | null) {
     if (!files) return;
     const added = Array.from(files).map(file => {
