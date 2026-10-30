@@ -64,6 +64,10 @@ export default function App() {
 
   function patchClip(id: string, patch: Partial<Clip>) { setClips(old => old.map(c => c.id === id ? { ...c, ...patch } : c)); }
   async function exportSelectedVideo() {
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" && window.location.protocol !== "file:") {
+      setStatus("A exportação MP4 online ainda está em integração. Podes importar e preparar clips nesta versão web; o motor de renderização será ligado numa etapa própria.");
+      return;
+    }
     if (!selectedClip || selectedClip.kind !== "video" || !selectedClip.file) {
       setStatus("Seleciona um vídeo importado nesta sessão para renderizar.");
       return;
@@ -278,13 +282,13 @@ export default function App() {
               <input type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Cola aqui a tua chave secreta do Google AI Studio"/>
             </label>
             <div className="setup-actions">
-              <button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button>
+              {window.novaSecureStore && <button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button>}
               <button className="primary" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar ligação…" : "Testar ligação Gemini"}</button>
             </div>
             {geminiModels.length > 0 && <label className="setup-field">Modelo Gemini
               <select value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select>
             </label>}
-            <div className="setup-help"><Bot size={17}/><span>A chave é guardada localmente com encriptação do Electron/Windows. Não é incluída no instalador, nos commits nem no GitHub. No navegador, a chave só pode ser usada temporariamente nesta sessão.</span></div>
+            <div className="setup-help"><Bot size={17}/><span>No site web, a chave API é enviada por HTTPS ao endpoint seguro apenas quando fazes um pedido e não é guardada na aplicação. Fecha a sessão do navegador para limpar o campo. Na aplicação Windows, podes usar o armazenamento encriptado do Electron.</span></div>
           </div>
           <div className="setup-card secondary-setup">
             <h2>Outros fornecedores</h2><p>OpenAI e Anthropic podem ser configurados depois, no mesmo painel. As respetivas chaves também não devem ser colocadas no código-fonte.</p>
@@ -297,7 +301,7 @@ export default function App() {
         {["image","video","voice","assets"].includes(active) && <section className="tool-view"><span className="eyebrow">NOVA CREATIVE SUITE</span><h1>{modules.find(m => m.id === active)?.label || "Definições de IA"}</h1><p>Este módulo está previsto na arquitetura do NOVA AI STUDIO.</p><div className="feature-grid">{(active === "video" ? ["Texto para vídeo","Imagem para vídeo","Transformação de vídeo","Avatares realistas"] : active === "voice" ? ["Texto para voz","Clonagem autorizada de voz","Dobragem e tradução","Sincronização labial"] : active === "image" ? ["Imagem por prompt","Edição generativa","Personagens e cenários","Design publicitário"] : active === "assets" ? ["Projetos","Media importada","Modelos e presets","Exportações"] : ["OpenAI","Google Gemini","Anthropic","Mais fornecedores"]).map(item => <div className="feature-card" key={item}><Sparkles size={18}/><b>{item}</b><span>Em integração</span></div>)}</div><div className="notice"><Bot size={18}/><span>Este módulo ainda não executa gerações reais. Será ligado a fornecedores e serviços compatíveis após implementação e testes.</span></div></section>}
       </main>
     </div>
-    <footer className="statusbar"><span><span className="live-dot"/>{status}</span><span>Web + Windows Desktop · {clips.length} media no projeto</span></footer>
+    <footer className="statusbar"><span><span className="live-dot"/>{status}</span><span>Versão Web · {clips.length} ficheiro(s) nesta sessão</span></footer>
   </div>;
 }
 
