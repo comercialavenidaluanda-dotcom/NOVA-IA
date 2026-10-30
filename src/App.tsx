@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Aperture, AudioLines, Bot, Code2, Download, Film, FolderOpen, ImagePlus, Layers3, Mic2, MonitorPlay, Plus, Scissors, Settings2, Sparkles, Upload, WandSparkles, RotateCcw, RotateCw, FlipHorizontal, SlidersHorizontal, Eye, Files, TerminalSquare, MessageSquare, Image as ImageIcon } from "lucide-react";
+import { Aperture, AudioLines, Bot, Code2, Copy, Download, Film, FolderOpen, ImagePlus, Layers3, Mic2, MonitorPlay, Plus, Scissors, Settings2, Sparkles, Upload, WandSparkles, RotateCcw, RotateCw, FlipHorizontal, SlidersHorizontal, Eye, Files, TerminalSquare, MessageSquare, Image as ImageIcon, ChevronUp, ChevronDown } from "lucide-react";
 
 type Clip = { id: string; name: string; url: string; kind: string; duration: number; trimStart: number; trimEnd: number; volume: number; speed: number; effect: string };
 type Provider = "openai" | "google" | "anthropic";
@@ -47,6 +47,49 @@ export default function App() {
 
   function patchClip(id: string, patch: Partial<Clip>) { setClips(old => old.map(c => c.id === id ? { ...c, ...patch } : c)); }
 
+  function splitSelectedClip() {
+    if (!selectedClip || selectedClip.kind === "image") {
+      setStatus("Seleciona um vídeo ou áudio e posiciona a reprodução no ponto de corte.");
+      return;
+    }
+    const playhead = selectedClip.kind === "video" ? videoRef.current?.currentTime : audioRef.current?.currentTime;
+    if (playhead === undefined || playhead === null || playhead <= selectedClip.trimStart + 0.05 || playhead >= selectedClip.trimEnd - 0.05) {
+      setStatus("Coloca o cursor de reprodução dentro do clip, afastado das extremidades.");
+      return;
+    }
+    const left = { ...selectedClip, id: crypto.randomUUID(), name: selectedClip.name + " · Parte 1", trimEnd: playhead };
+    const right = { ...selectedClip, id: crypto.randomUUID(), name: selectedClip.name + " · Parte 2", trimStart: playhead };
+    setClips(old => old.flatMap(c => c.id === selectedClip.id ? [left, right] : [c]));
+    setSelected(right.id);
+    setStatus("Clip dividido no ponto de reprodução.");
+  }
+
+  function duplicateSelectedClip() {
+    if (!selectedClip) return;
+    const copy = { ...selectedClip, id: crypto.randomUUID(), name: selectedClip.name + " · cópia" };
+    setClips(old => {
+      const index = old.findIndex(c => c.id === selectedClip.id);
+      const next = [...old];
+      next.splice(index + 1, 0, copy);
+      return next;
+    });
+    setSelected(copy.id);
+    setStatus("Clip duplicado.");
+  }
+
+  function moveSelectedClip(direction: -1 | 1) {
+    if (!selectedClip) return;
+    setClips(old => {
+      const from = old.findIndex(c => c.id === selectedClip.id);
+      const to = from + direction;
+      if (from < 0 || to < 0 || to >= old.length) return old;
+      const next = [...old];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+    setStatus(direction < 0 ? "Clip movido para cima na sequência." : "Clip movido para baixo na sequência.");
+  }
+
   async function askAI() {
     if (!apiKey.trim() || !prompt.trim()) { setStatus("Introduz a chave e o pedido."); return; }
     setBusy(true); setAnswer(""); setStatus("A contactar " + provider + "…");
@@ -91,10 +134,10 @@ export default function App() {
               </div>
               <div className="preview-controls"><span>{selectedClip?.name || "Nenhum clip selecionado"}</span><span>{duration ? duration.toFixed(1) + "s" : "00:00:00"}</span></div>
             </div>
-            <div className="inspector"><div className="panel-top"><span><Layers3 size={15}/> INSPECTOR</span><Settings2 size={15}/></div>{selectedClip ? <><div className="asset-thumb">{selectedClip.kind === "image" ? <img src={selectedClip.url} alt=""/> : <Film/>}</div><b className="asset-name">{selectedClip.name}</b><div className="property"><span>Tipo</span><b>{selectedClip.kind}</b></div><div className="property"><span>Duração original</span><b>{selectedClip.duration.toFixed(1)}s</b></div><div className="edit-controls"><label>Início (seg.)<input type="number" min="0" max={selectedClip.duration} step="0.1" value={selectedClip.trimStart} onChange={e => patchClip(selectedClip.id, { trimStart: Math.min(Number(e.target.value), selectedClip.trimEnd - 0.1) })}/></label><label>Fim (seg.)<input type="number" min={selectedClip.trimStart + 0.1} max={selectedClip.duration} step="0.1" value={selectedClip.trimEnd} onChange={e => patchClip(selectedClip.id, { trimEnd: Math.min(selectedClip.duration, Math.max(Number(e.target.value), selectedClip.trimStart + 0.1)) })}/></label><label>Velocidade<select value={selectedClip.speed} onChange={e => { const speed = Number(e.target.value); patchClip(selectedClip.id, { speed }); if (videoRef.current) videoRef.current.playbackRate = speed; if (audioRef.current) audioRef.current.playbackRate = speed; }}><option value="0.5">0,5×</option><option value="0.75">0,75×</option><option value="1">1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option><option value="2">2×</option></select></label><label>Volume<select value={selectedClip.volume} onChange={e => { const volume = Number(e.target.value); patchClip(selectedClip.id, { volume }); if (videoRef.current) videoRef.current.volume = volume; if (audioRef.current) audioRef.current.volume = volume; }}><option value="0">Mudo</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option></select></label><label className="full-field">Efeito visual<select value={selectedClip.effect} onChange={e => patchClip(selectedClip.id, { effect: e.target.value })}><option value="none">Original</option><option value="mono">Preto e branco</option><option value="warm">Quente</option><option value="cool">Frio</option><option value="vivid">Cores vivas</option><option value="cinema">Cinema</option><option value="soft">Suave</option></select></label></div><div className="property"><span>Duração editada</span><b>{Math.max(0, selectedClip.trimEnd - selectedClip.trimStart).toFixed(1)}s</b></div><button className="danger subtle" onClick={() => { setClips(old => old.filter(c => c.id !== selected)); setSelected(null); }}>Remover clip</button></> : <div className="inspector-empty">Seleciona um clip na biblioteca ou timeline para editar as suas propriedades.</div>}</div>
+            <div className="inspector"><div className="panel-top"><span><Layers3 size={15}/> INSPECTOR</span><Settings2 size={15}/></div>{selectedClip ? <><div className="asset-thumb">{selectedClip.kind === "image" ? <img src={selectedClip.url} alt=""/> : <Film/>}</div><b className="asset-name">{selectedClip.name}</b><div className="property"><span>Tipo</span><b>{selectedClip.kind}</b></div><div className="property"><span>Duração original</span><b>{selectedClip.duration.toFixed(1)}s</b></div><div className="edit-controls"><label>Início (seg.)<input type="number" min="0" max={selectedClip.duration} step="0.1" value={selectedClip.trimStart} onChange={e => patchClip(selectedClip.id, { trimStart: Math.min(Number(e.target.value), selectedClip.trimEnd - 0.1) })}/></label><label>Fim (seg.)<input type="number" min={selectedClip.trimStart + 0.1} max={selectedClip.duration} step="0.1" value={selectedClip.trimEnd} onChange={e => patchClip(selectedClip.id, { trimEnd: Math.min(selectedClip.duration, Math.max(Number(e.target.value), selectedClip.trimStart + 0.1)) })}/></label><label>Velocidade<select value={selectedClip.speed} onChange={e => { const speed = Number(e.target.value); patchClip(selectedClip.id, { speed }); if (videoRef.current) videoRef.current.playbackRate = speed; if (audioRef.current) audioRef.current.playbackRate = speed; }}><option value="0.5">0,5×</option><option value="0.75">0,75×</option><option value="1">1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option><option value="2">2×</option></select></label><label>Volume<select value={selectedClip.volume} onChange={e => { const volume = Number(e.target.value); patchClip(selectedClip.id, { volume }); if (videoRef.current) videoRef.current.volume = volume; if (audioRef.current) audioRef.current.volume = volume; }}><option value="0">Mudo</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option></select></label><label className="full-field">Efeito visual<select value={selectedClip.effect} onChange={e => patchClip(selectedClip.id, { effect: e.target.value })}><option value="none">Original</option><option value="mono">Preto e branco</option><option value="warm">Quente</option><option value="cool">Frio</option><option value="vivid">Cores vivas</option><option value="cinema">Cinema</option><option value="soft">Suave</option></select></label></div><div className="property"><span>Duração editada</span><b>{Math.max(0, selectedClip.trimEnd - selectedClip.trimStart).toFixed(1)}s</b></div><div className="clip-actions"><button className="outline" onClick={splitSelectedClip}><Scissors size={13}/> Dividir no cursor</button><button className="outline" onClick={duplicateSelectedClip}><Copy size={13}/> Duplicar</button><button className="outline" onClick={() => moveSelectedClip(-1)} title="Mover para cima"><ChevronUp size={14}/></button><button className="outline" onClick={() => moveSelectedClip(1)} title="Mover para baixo"><ChevronDown size={14}/></button></div><button className="danger subtle" onClick={() => { setClips(old => old.filter(c => c.id !== selected)); setSelected(null); }}>Remover clip</button></> : <div className="inspector-empty">Seleciona um clip na biblioteca ou timeline para editar as suas propriedades.</div>}</div>
           </div>
           <div className="title-tools"><div><b>Camada de texto</b><span>Pré-visualização do título sobre o vídeo</span></div><input value={titleText} onChange={e => setTitleText(e.target.value)} placeholder="Escreve o título ou legenda…"/><label>Cor <input type="color" value={titleColor} onChange={e => setTitleColor(e.target.value)}/></label><label>Tamanho <input type="range" min="16" max="72" value={titleSize} onChange={e => setTitleSize(Number(e.target.value))}/></label><button className="ghost" onClick={() => setTitleText("")}>Limpar</button></div>
-          <div className="timeline"><div className="timeline-head"><div><b><Scissors size={15}/> TIMELINE</b><span>{clips.length} media · {clips.length} pista(s)</span></div><button className="icon-button" onClick={() => fileRef.current?.click()}><Plus size={17}/></button></div><div className="ruler"><span>00:00</span><span>00:10</span><span>00:20</span><span>00:30</span><span>00:40</span><span>00:50</span></div><div className="track"><div className="track-label">VÍDEO 1</div><div className="track-content">{clips.filter(c => c.kind !== "audio").map(c => <button key={c.id} className={"clip video-clip " + (selected === c.id ? "chosen" : "")} onClick={() => setSelected(c.id)}>{c.kind === "image" ? <ImagePlus size={13}/> : <Film size={13}/>}<span>{c.name}</span><small>{Math.max(0, c.trimEnd - c.trimStart).toFixed(1)}s</small></button>)}</div></div><div className="track"><div className="track-label">ÁUDIO 1</div><div className="track-content">{clips.filter(c => c.kind === "audio").map(c => <button key={c.id} className={"clip audio-clip " + (selected === c.id ? "chosen" : "")} onClick={() => setSelected(c.id)}><AudioLines size={13}/><span>{c.name}</span><small>{Math.max(0, c.trimEnd - c.trimStart).toFixed(1)}s</small></button>)}</div></div></div>
+          <div className="timeline"><div className="timeline-head"><div><b><Scissors size={15}/> TIMELINE</b><span>{clips.length} clips · sequência editável</span></div><div className="timeline-actions"><button className="outline" disabled={!selectedClip} onClick={splitSelectedClip}><Scissors size={13}/> Dividir</button><button className="outline" disabled={!selectedClip} onClick={duplicateSelectedClip}><Copy size={13}/> Duplicar</button><button className="icon-button" onClick={() => fileRef.current?.click()} title="Importar media"><Plus size={17}/></button></div></div><div className="ruler"><span>00:00</span><span>00:10</span><span>00:20</span><span>00:30</span><span>00:40</span><span>00:50</span></div><div className="track"><div className="track-label">VÍDEO 1</div><div className="track-content">{clips.filter(c => c.kind !== "audio").map(c => <button key={c.id} className={"clip video-clip " + (selected === c.id ? "chosen" : "")} onClick={() => setSelected(c.id)}>{c.kind === "image" ? <ImagePlus size={13}/> : <Film size={13}/>}<span>{c.name}</span><small>{Math.max(0, c.trimEnd - c.trimStart).toFixed(1)}s</small></button>)}</div></div><div className="track"><div className="track-label">ÁUDIO 1</div><div className="track-content">{clips.filter(c => c.kind === "audio").map(c => <button key={c.id} className={"clip audio-clip " + (selected === c.id ? "chosen" : "")} onClick={() => setSelected(c.id)}><AudioLines size={13}/><span>{c.name}</span><small>{Math.max(0, c.trimEnd - c.trimStart).toFixed(1)}s</small></button>)}</div></div></div>
           <div className="media-library"><div className="library-title"><b><FolderOpen size={16}/> Biblioteca de media</b><span>{clips.length} itens</span></div>{clips.length ? <div className="asset-list">{clips.map(c => <button key={c.id} className={"asset-row " + (selected === c.id ? "chosen" : "")} onClick={() => setSelected(c.id)}><span className="asset-icon">{c.kind === "audio" ? <AudioLines/> : c.kind === "image" ? <ImagePlus/> : <Film/>}</span><span>{c.name}</span><small>{c.kind}</small></button>)}</div> : <div className="library-empty" onClick={() => fileRef.current?.click()}><Upload size={19}/> Arrasta os teus ficheiros para aqui ou clica para importar</div>}</div>
         </section>}
         {active === "developer" && <section className="build-studio">
