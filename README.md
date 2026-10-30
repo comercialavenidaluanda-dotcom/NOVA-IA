@@ -4,16 +4,19 @@ Plataforma web e desktop para criação multimédia assistida por IA e desenvolv
 
 ## O que já existe nesta fundação
 - Interface React/TypeScript em português.
+- NOVA Build Studio inspirado no fluxo de construção por prompt: explorador visual, chat multimodelo e painel de preview/código.
+- NOVA Photo Lab com edição de imagem no browser e exportação PNG/JPEG.
 - Importação local de vídeo, áudio e imagem, com pré-visualização.
 - Biblioteca de media e timeline inicial com pistas de vídeo e áudio.
 - Ajustes básicos por clip: ponto de entrada/saída, velocidade, volume e filtros visuais.
 - Camada de título/legenda com texto, cor e tamanho configuráveis.
-- Área NOVA AI Developer com pedidos de chat para OpenAI, Google Gemini e Anthropic.
+- NOVA Build Studio com estrutura visual de projecto, painel de conversa multimodelo e áreas de pré-visualização/código em preparação.
+- NOVA Photo Lab com importação local, luminosidade, contraste, saturação, desfoque, rotação, espelhamento, cortes predefinidos e exportação PNG/JPEG.
 - Shell Electron e configuração NSIS para instalador Windows.
 - GitHub Actions para compilar o instalador em Windows quando há alterações na branch main ou tags v*.
 
 ## Ainda em desenvolvimento
-Esta versão não é ainda um editor profissional completo. Exportação/renderização final, transições reais, keyframes, composição avançada, efeitos 3D, geração de vídeo/imagem, avatares, lip-sync, voz, música e colaboração ainda precisam de implementação e testes. Não se deve considerar um módulo disponível só por aparecer na interface.
+Esta versão ainda não é uma plataforma equivalente ao Google AI Studio nem um editor profissional completo. O Build Studio tem a estrutura de interface, mas o agente ainda não cria/edita ficheiros automaticamente, não executa comandos e não mantém um preview vivo. O Photo Lab já aplica ajustes locais e exporta PNG/JPEG, mas ainda não tem camadas, máscaras, seleções avançadas, texto, retoque, RAW ou edição não destrutiva. O editor de vídeo ainda não tem renderização/exportação final, transições reais, keyframes ou composição avançada. Geração de vídeo/imagem, avatares, lip-sync, voz, música e colaboração precisam de integrações e testes reais.
 
 ## Requisitos
 - Node.js 20+
