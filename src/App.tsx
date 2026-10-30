@@ -190,24 +190,42 @@ export default function App() {
   }
 
   async function askAI() {
-    const activeKey = apiKey.trim() || (provider === "google" && window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
-    if (!activeKey || !prompt.trim()) { setStatus("Introduz ou guarda a chave API e escreve o pedido."); return; }
+    if (busy) return;
+    const cleanPrompt = prompt.trim();
+    if (!cleanPrompt) { setStatus("Escreve o pedido antes de executar."); return; }
     const chosenModel = model.trim() || (provider === "google" ? "gemini-2.5-flash" : "");
     if (!chosenModel) { setStatus("Indica o ID do modelo para este fornecedor."); return; }
-    setBusy(true); setAnswer(""); setStatus("A contactar " + provider + "…");
+
+    setBusy(true);
+    setAnswer("");
+    setStatus("A preparar pedido…");
+    let requestStarted = false;
     try {
+      const activeKey = apiKey.trim() || (provider === "google" && window.novaSecureStore
+        ? await window.novaSecureStore.getGeminiKey()
+        : "");
+      if (!activeKey) throw new Error("Introduz a chave API do fornecedor selecionado.");
+
+      setStatus("A contactar " + provider + "…");
+      requestStarted = true;
       const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
       const response = await fetch(apiBase + "/api/ai/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, apiKey: activeKey, model: chosenModel, prompt })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, apiKey: activeKey, model: chosenModel, prompt: cleanPrompt })
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Falha no fornecedor");
-      setAnswer(data.text || "O fornecedor não devolveu texto.");
-      setStatus("Resposta recebida");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "O servidor de IA recusou o pedido (" + response.status + ").");
+      const responseText = typeof data.text === "string" ? data.text.trim() : "";
+      if (!responseText) throw new Error("O fornecedor respondeu sem texto. Verifica o modelo e a chave API.");
+      setAnswer(responseText);
+      setStatus("Resposta recebida com sucesso.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Erro ao contactar IA");
-    } finally { setBusy(false); setApiKey(""); }
+      setStatus(error instanceof Error ? error.message : "Erro inesperado ao contactar a IA.");
+    } finally {
+      setBusy(false);
+      if (requestStarted) setApiKey("");
+    }
   }
 
   return <div className="app-shell">
@@ -260,7 +278,7 @@ export default function App() {
               <div className="build-composer">
                 <div className="composer-options"><label>Fornecedor <ProviderSelect provider={provider} setProvider={p => { setProvider(p); setModel(p === "google" ? "gemini-2.5-flash" : ""); }}/>{provider === "google" && geminiModels.length > 0 ? <select className="model-input" value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select> : <input className="model-input" value={model} onChange={e => setModel(e.target.value)} placeholder={provider === "google" ? "gemini-2.5-flash" : "ID do modelo"}/>}</label><label className="key-entry">Chave API <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={provider === "google" ? "Gemini API Key" : "Chave oficial do fornecedor"}/></label></div>{provider === "google" && <div className="gemini-tools"><span>{geminiKeySaved ? "Chave Gemini guardada neste computador" : "Google AI · chave não guardada"} · modelos da tua chave</span><div className="gemini-tool-actions"><button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button><button className="outline" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar…" : "Testar ligação Gemini"}</button></div></div>}
                 <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Descreve o que queres criar ou alterar neste projecto…"/>
-                <div className="composer-bottom"><span><MessageSquare size={13}/> As chaves são usadas apenas neste pedido</span><button className="primary" disabled={busy} onClick={askAI}><Sparkles size={15}/>{busy ? "A processar…" : "Executar pedido"}</button></div>
+                <div className="composer-bottom"><span><MessageSquare size={13}/> As chaves são usadas apenas neste pedido</span><button type="button" className="primary" disabled={busy} onClick={askAI}><Sparkles size={15}/>{busy ? "A processar…" : "Executar pedido"}</button></div><div className={"composer-status" + (busy ? " is-busy" : "")} role="status" aria-live="polite">{status}</div>
               </div>
             </div>
             <aside className="build-preview">
