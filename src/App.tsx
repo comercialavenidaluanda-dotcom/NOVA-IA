@@ -11,7 +11,8 @@ const modules = [
   { id: "image", label: "Geração de imagem IA", icon: ImagePlus },
   { id: "video", label: "Vídeo IA", icon: WandSparkles },
   { id: "voice", label: "Estúdio de voz", icon: Mic2 },
-  { id: "assets", label: "Biblioteca", icon: FolderOpen }
+  { id: "assets", label: "Biblioteca", icon: FolderOpen },
+  { id: "settings", label: "Configurar IA", icon: Settings2 }
 ];
 
 export default function App() {
@@ -28,7 +29,10 @@ export default function App() {
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Pronto para criar");
-  const [duration, setDuration] = useState(0);\n  const [rendering, setRendering] = useState(false);\n  const [renderResolution, setRenderResolution] = useState("1080");\n  const [renderFps, setRenderFps] = useState("30");
+  const [duration, setDuration] = useState(0);
+  const [rendering, setRendering] = useState(false);
+  const [renderResolution, setRenderResolution] = useState("1080");
+  const [renderFps, setRenderFps] = useState("30");
   const [titleText, setTitleText] = useState("");
   const [titleColor, setTitleColor] = useState("#ffffff");
   const [titleSize, setTitleSize] = useState(34);
@@ -38,7 +42,13 @@ export default function App() {
   const selectedClip = useMemo(() => clips.find(c => c.id === selected), [clips, selected]);
 
   useEffect(() => {
-    window.novaSecureStore?.hasGeminiKey().then(setGeminiKeySaved).catch(() => setGeminiKeySaved(false));
+    let mounted = true;
+    window.novaSecureStore?.hasGeminiKey().then(saved => {
+      if (!mounted) return;
+      setGeminiKeySaved(saved);
+      if (!saved) setActive("settings");
+    }).catch(() => { if (mounted) setGeminiKeySaved(false); });
+    return () => { mounted = false; };
   }, []);
 
   function importFiles(files: FileList | null) {
@@ -200,7 +210,7 @@ export default function App() {
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Aperture size={22}/></div><div><strong>NOVA <span>AI</span> STUDIO</strong><small>CREATE WITHOUT LIMITS</small></div></div>
       <div className="project-name"><span className="live-dot"/> Projeto sem título <span className="saved">● Local</span></div>
-      <div className="top-actions"><button className="ghost"><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
+      <div className="top-actions"><button className="ghost" onClick={() => setActive("settings")}><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
     </header>
     <div className="workspace">
       <aside className="sidebar">
@@ -257,8 +267,33 @@ export default function App() {
             </aside>
           </div>
         </section>}
+{active === "settings" && <section className="tool-view setup-view">
+          <span className="eyebrow">PRIMEIRO ARRANQUE · CONFIGURAÇÃO LOCAL</span>
+          <h1>Configuração do NOVA AI STUDIO</h1>
+          <p>Configura os fornecedores de inteligência artificial neste computador. Não precisas de criar GitHub Secrets para usar a tua Gemini API Key.</p>
+          <div className="setup-card">
+            <div className="setup-card-heading"><div><span className="setup-kicker">FORNECEDOR PRINCIPAL</span><h2>Google Gemini</h2><p>Project ID: 655392085298</p></div><span className={geminiKeySaved ? "setup-status connected" : "setup-status"}>{geminiKeySaved ? "Chave guardada neste PC" : "Configuração pendente"}</span></div>
+            <label className="setup-field">Gemini API Key
+              <input type="password" autoComplete="off" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Cola aqui a tua chave secreta do Google AI Studio"/>
+            </label>
+            <div className="setup-actions">
+              <button className="outline" disabled={!apiKey.trim()} onClick={saveGeminiKey}>Guardar chave encriptada</button>
+              <button className="primary" disabled={testingGemini || (!apiKey.trim() && !geminiKeySaved)} onClick={testGeminiConnection}>{testingGemini ? "A testar ligação…" : "Testar ligação Gemini"}</button>
+            </div>
+            {geminiModels.length > 0 && <label className="setup-field">Modelo Gemini
+              <select value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select>
+            </label>}
+            <div className="setup-help"><Bot size={17}/><span>A chave é guardada localmente com encriptação do Electron/Windows. Não é incluída no instalador, nos commits nem no GitHub. No navegador, a chave só pode ser usada temporariamente nesta sessão.</span></div>
+          </div>
+          <div className="setup-card secondary-setup">
+            <h2>Outros fornecedores</h2><p>OpenAI e Anthropic podem ser configurados depois, no mesmo painel. As respetivas chaves também não devem ser colocadas no código-fonte.</p>
+            <div className="setup-provider-row"><span>OpenAI</span><span>Disponível para configurar</span></div>
+            <div className="setup-provider-row"><span>Anthropic</span><span>Disponível para configurar</span></div>
+          </div>
+          <div className="setup-footer"><span>{status}</span><button className="ghost" onClick={() => setActive("developer")}>Abrir NOVA Build Studio</button></div>
+        </section>}
         {active === "photo-editor" && <PhotoEditor />}
-        {["image","video","voice","assets","settings"].includes(active) && <section className="tool-view"><span className="eyebrow">NOVA CREATIVE SUITE</span><h1>{modules.find(m => m.id === active)?.label || "Definições de IA"}</h1><p>Este módulo está previsto na arquitetura do NOVA AI STUDIO.</p><div className="feature-grid">{(active === "video" ? ["Texto para vídeo","Imagem para vídeo","Transformação de vídeo","Avatares realistas"] : active === "voice" ? ["Texto para voz","Clonagem autorizada de voz","Dobragem e tradução","Sincronização labial"] : active === "image" ? ["Imagem por prompt","Edição generativa","Personagens e cenários","Design publicitário"] : active === "assets" ? ["Projetos","Media importada","Modelos e presets","Exportações"] : ["OpenAI","Google Gemini","Anthropic","Mais fornecedores"]).map(item => <div className="feature-card" key={item}><Sparkles size={18}/><b>{item}</b><span>Em integração</span></div>)}</div><div className="notice"><Bot size={18}/><span>Este módulo ainda não executa gerações reais. Será ligado a fornecedores e serviços compatíveis após implementação e testes.</span></div></section>}
+        {["image","video","voice","assets"].includes(active) && <section className="tool-view"><span className="eyebrow">NOVA CREATIVE SUITE</span><h1>{modules.find(m => m.id === active)?.label || "Definições de IA"}</h1><p>Este módulo está previsto na arquitetura do NOVA AI STUDIO.</p><div className="feature-grid">{(active === "video" ? ["Texto para vídeo","Imagem para vídeo","Transformação de vídeo","Avatares realistas"] : active === "voice" ? ["Texto para voz","Clonagem autorizada de voz","Dobragem e tradução","Sincronização labial"] : active === "image" ? ["Imagem por prompt","Edição generativa","Personagens e cenários","Design publicitário"] : active === "assets" ? ["Projetos","Media importada","Modelos e presets","Exportações"] : ["OpenAI","Google Gemini","Anthropic","Mais fornecedores"]).map(item => <div className="feature-card" key={item}><Sparkles size={18}/><b>{item}</b><span>Em integração</span></div>)}</div><div className="notice"><Bot size={18}/><span>Este módulo ainda não executa gerações reais. Será ligado a fornecedores e serviços compatíveis após implementação e testes.</span></div></section>}
       </main>
     </div>
     <footer className="statusbar"><span><span className="live-dot"/>{status}</span><span>Web + Windows Desktop · {clips.length} media no projeto</span></footer>
