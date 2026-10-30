@@ -24,7 +24,6 @@ export default function App() {
   const [apiKey, setApiKey] = useState("");
   const [geminiModels, setGeminiModels] = useState<{ name: string; displayName?: string }[]>([]);
   const [testingGemini, setTestingGemini] = useState(false);
-  const [geminiKeySaved, setGeminiKeySaved] = useState(false);
   const [savedProviders, setSavedProviders] = useState<Record<Provider, boolean>>({ openai: false, google: false, anthropic: false });
   const [prompt, setPrompt] = useState("");
   const [answer, setAnswer] = useState("");
@@ -54,7 +53,6 @@ export default function App() {
         ]);
         if (!mounted) return;
         setSavedProviders({ google, openai, anthropic });
-        setGeminiKeySaved(google);
         if (!google && !openai && !anthropic) setActive("settings");
       } catch { if (mounted) setActive("settings"); }
     };
@@ -166,7 +164,6 @@ export default function App() {
       const result = await window.novaSecureStore.saveApiKey(provider, apiKey.trim());
       if (result?.saved) {
         setSavedProviders(old => ({ ...old, [provider]: true }));
-        if (provider === "google") setGeminiKeySaved(true);
         setApiKey("");
       }
       setStatus(result?.saved ? "Chave " + provider + " guardada de forma encriptada neste computador." : "Não foi possível guardar a chave de forma segura.");
@@ -174,8 +171,6 @@ export default function App() {
       setStatus("Falha ao guardar a chave de forma segura.");
     }
   }
-
-  async function saveGeminiKey() { await saveProviderKey(); }
 
   async function testSelectedProvider() {
     if (provider === "google") { await testGeminiConnection(); return; }
@@ -199,7 +194,7 @@ export default function App() {
   }
 
   async function testGeminiConnection() {
-    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getGeminiKey() : "");
+    const activeKey = apiKey.trim() || (window.novaSecureStore ? await window.novaSecureStore.getApiKey("google") : "");
     if (!activeKey) { setStatus("Introduz ou guarda a tua Gemini API Key para testar a ligação."); return; }
     setTestingGemini(true);
     setStatus("A validar a chave Gemini…");
@@ -328,7 +323,7 @@ export default function App() {
               <button className="primary" disabled={testingGemini || (!apiKey.trim() && !savedProviders[provider])} onClick={testSelectedProvider}>{testingGemini ? "A testar ligação…" : "Testar ligação"}</button>
             </div>
             {provider === "google" && geminiModels.length > 0 && <label className="setup-field">Modelos Gemini disponíveis
-              <select value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\\//, "")}>{item.displayName || item.name}</option>)}</select>
+              <select value={model} onChange={e => setModel(e.target.value)}>{geminiModels.map(item => <option key={item.name} value={item.name.replace(/^models\//, "")}>{item.displayName || item.name}</option>)}</select>
             </label>}
             <div className="setup-help"><Bot size={17}/><span>As chaves são encriptadas localmente com Electron Safe Storage. Não coloques chaves nos ficheiros do projeto, commits ou artefactos de instalação. No navegador, o armazenamento seguro não está disponível.</span></div>
           </div>
