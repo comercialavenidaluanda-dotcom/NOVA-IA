@@ -239,13 +239,13 @@ export default function App() {
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Aperture size={22}/></div><div><strong>NOVA <span>AI</span> STUDIO</strong><small>CREATE WITHOUT LIMITS</small></div></div>
       <div className="project-name"><span className="live-dot"/> Projeto sem título <span className="saved">● Local</span></div>
-      <div className="top-actions"><button className="ghost" onClick={() => setActive("help")}><CircleHelp size={16}/> Ajuda</button><button className="ghost" onClick={() => setActive("settings")}><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
+      <div className="top-actions"><button type="button" className="ghost" onClick={() => { setActive("help"); setStatus("A abrir Ajuda e primeiros passos."); }}><CircleHelp size={16}/> Ajuda</button><button type="button" className="ghost" onClick={() => { setActive("settings"); setStatus("A abrir Configurar IA."); }}><Settings2 size={16}/> Definições</button><button className="primary" onClick={() => setStatus("Exportação de vídeo será ativada numa etapa seguinte.")}>Exportar projeto</button></div>
     </header>
     <div className="workspace">
       <aside className="sidebar">
         <div className="side-label">WORKSPACE</div>
-        {modules.map(m => <button key={m.id} className={"nav-item " + (active === m.id ? "active" : "")} onClick={() => setActive(m.id)}><m.icon size={18}/>{m.label}</button>)}
-        <div className="side-bottom"><div className="side-label">NOVA AI</div><div className="plan-card"><Sparkles size={17}/><b>Studio multimodelo</b><p>Liga os teus fornecedores oficiais de IA.</p><button onClick={() => setActive("settings")}>Configurar IA</button></div><div className="version">NOVA AI STUDIO · Preview 0.1</div></div>
+        {modules.map(m => <button type="button" key={m.id} className={"nav-item " + (active === m.id ? "active" : "")} aria-current={active === m.id ? "page" : undefined} onClick={() => { setActive(m.id); setStatus("A abrir " + m.label + "."); }}><m.icon size={18}/>{m.label}</button>)}
+        <div className="side-bottom"><div className="side-label">NOVA AI</div><div className="plan-card"><Sparkles size={17}/><b>Studio multimodelo</b><p>Liga os teus fornecedores oficiais de IA.</p><button type="button" onClick={() => { setActive("settings"); setStatus("A abrir Configurar IA."); }}>Configurar IA</button></div><div className="version">NOVA AI STUDIO · Preview 0.1</div></div>
       </aside>
       <main className="main">
         {active === "editor" && <section className="editor-view">
