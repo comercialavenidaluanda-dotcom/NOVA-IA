@@ -3,7 +3,7 @@ import cors from "cors";
 
 const app = express();
 app.disable("x-powered-by");
-app.use(cors({ origin: process.env.NODE_ENV === "production" ? false : true }));
+app.use(cors({ origin: (origin, callback) => {\n  if (!origin || origin === "null" || origin === "http://localhost:5173") return callback(null, true);\n  return callback(new Error("Origem não autorizada."));\n} }));
 app.use(express.json({ limit: "1mb" }));
 
 type Provider = "openai" | "google" | "anthropic";
@@ -17,7 +17,7 @@ app.post("/api/ai/chat", async (req, res) => {
   const prompt = safeText(req.body?.prompt);
   const model = safeText(req.body?.model, 160);
   if (!["openai", "google", "anthropic"].includes(provider)) return res.status(400).json({ error: "Fornecedor não suportado." });
-  if (!apiKey || !prompt) return res.status(400).json({ error: "Chave API e pedido são obrigatórios." });
+  if (!apiKey || !prompt || !model) return res.status(400).json({ error: "Chave API, ID do modelo ativo e pedido são obrigatórios." });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60000);
   try {
@@ -27,9 +27,9 @@ app.post("/api/ai/chat", async (req, res) => {
     if (provider === "openai") {
       url = "https://api.openai.com/v1/chat/completions";
       headers.Authorization = "Bearer " + apiKey;
-      body = { model: model || "gpt-4.1-mini", messages: [{ role: "user", content: prompt }], temperature: 0.7 };
+      body = { model, messages: [{ role: "user", content: prompt }], temperature: 0.7 };
     } else if (provider === "google") {
-      const chosen = model || "gemini-2.5-flash";
+      const chosen = model;
       url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(chosen) + ":generateContent?key=" + encodeURIComponent(apiKey);
       body = { contents: [{ parts: [{ text: prompt }] }] };
     } else {
@@ -37,7 +37,7 @@ app.post("/api/ai/chat", async (req, res) => {
       headers["x-api-key"] = apiKey;
       headers["anthropic-version"] = "2023-06-01";
       headers["anthropic-dangerous-direct-browser-access"] = "false";
-      body = { model: model || "claude-3-5-haiku-latest", max_tokens: 2048, messages: [{ role: "user", content: prompt }] };
+      body = { model, max_tokens: 2048, messages: [{ role: "user", content: prompt }] };
     }
     const upstream = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });
     const data = await upstream.json() as any;
