@@ -1,5 +1,13 @@
 import express from "express";
 import cors from "cors";
+import multer from "multer";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import ffmpegStaticPath from "ffmpeg-static";
 
 const app = express();
 app.disable("x-powered-by");
@@ -14,7 +22,91 @@ app.use(express.json({ limit: "1mb" }));
 type Provider = "openai" | "google" | "anthropic";
 const safeText = (value: unknown, max = 12000) => typeof value === "string" ? value.trim().slice(0, max) : "";
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "nova-ai-studio-api", version: "0.1.0" }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, service: "nova-ai-studio-api", version: "0.2.0", videoRender: Boolean(resolveFfmpegPath()) }));
+
+function resolveFfmpegPath() {
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const packagedPath = resourcesPath ? path.join(resourcesPath, "ffmpeg.exe") : null;
+  const candidate = process.env.NOVA_FFMPEG_PATH || (packagedPath && existsSync(packagedPath) ? packagedPath : ffmpegStaticPath);
+  return candidate && existsSync(candidate) ? candidate : null;
+}
+
+const upload = multer({
+  dest: path.join(os.tmpdir(), "nova-ai-studio-uploads"),
+  limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (file.mimetype.startsWith("video/")) return callback(null, true);
+    callback(new Error("Importa um ficheiro de vídeo válido."));
+  }
+});
+
+app.post("/api/video/render", upload.single("file"), async (req, res) => {
+  const inputPath = req.file?.path;
+  if (!inputPath) return res.status(400).json({ error: "Ficheiro de vídeo em falta." });
+  const ffmpeg = resolveFfmpegPath();
+  if (!ffmpeg) {
+    await rm(inputPath, { force: true });
+    return res.status(503).json({ error: "Motor FFmpeg não encontrado nesta instalação." });
+  }
+
+  const trimStart = Number(req.body.trimStart);
+  const trimEnd = Number(req.body.trimEnd);
+  const speed = Number(req.body.speed);
+  const volume = Number(req.body.volume);
+  const resolution = req.body.resolution === "720" ? "1280:720" : "1920:1080";
+  const fps = [24, 30, 60].includes(Number(req.body.fps)) ? Number(req.body.fps) : 30;
+  const effect = safeText(req.body.effect, 20);
+  const duration = trimEnd - trimStart;
+
+  if (![trimStart, trimEnd, speed, volume].every(Number.isFinite) || trimStart < 0 || duration <= 0 || duration > 60 * 60 * 4 || speed < 0.5 || speed > 2 || volume < 0 || volume > 1) {
+    await rm(inputPath, { force: true });
+    return res.status(400).json({ error: "Parâmetros de edição inválidos." });
+  }
+
+  const outputPath = path.join(path.dirname(inputPath), randomUUID() + ".mp4");
+  const videoFilters = ["setpts=PTS/" + speed];
+  if (effect === "mono") videoFilters.push("hue=s=0");
+  if (effect === "warm") videoFilters.push("colorbalance=rs=0.08:gs=0.02:bs=-0.06");
+  if (effect === "cool") videoFilters.push("colorbalance=rs=-0.05:gs=0.01:bs=0.08");
+  if (effect === "vivid") videoFilters.push("eq=contrast=1.08:saturation=1.55");
+  if (effect === "cinema") videoFilters.push("eq=contrast=1.16:saturation=0.82");
+  if (effect === "soft") videoFilters.push("eq=brightness=0.04:saturation=0.85");
+  videoFilters.push("scale=" + resolution + ":force_original_aspect_ratio=decrease", "pad=" + resolution + ":(ow-iw)/2:(oh-ih)/2", "fps=" + fps);
+  const audioFilters = ["atempo=" + speed, "volume=" + volume];
+  const args = [
+    "-hide_banner", "-y", "-ss", String(trimStart), "-i", inputPath, "-t", String(duration),
+    "-map", "0:v:0", "-map", "0:a?", "-vf", videoFilters.join(","),
+    "-af", audioFilters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+    "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", outputPath
+  ];
+
+  const child = spawn(ffmpeg, args, { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+  let stderr = "";
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; child.kill(); }, 15 * 60 * 1000);
+  child.stderr.on("data", chunk => { stderr = (stderr + chunk.toString()).slice(-5000); });
+  child.on("error", async () => {
+    clearTimeout(timeout);
+    await rm(inputPath, { force: true });
+    await rm(outputPath, { force: true });
+    if (!res.headersSent) res.status(500).json({ error: "Não foi possível iniciar o FFmpeg." });
+  });
+  child.on("close", async code => {
+    clearTimeout(timeout);
+    await rm(inputPath, { force: true });
+    if (code !== 0) {
+      await rm(outputPath, { force: true });
+      if (!res.headersSent) res.status(timedOut ? 504 : 500).json({ error: timedOut ? "A renderização excedeu o limite de 15 minutos." : "Falha na renderização. Verifica o formato do vídeo e tenta novamente.", detail: stderr.slice(-900) });
+      return;
+    }
+    res.download(outputPath, "nova-ai-studio-video.mp4", async () => {
+      await rm(outputPath, { force: true });
+    });
+  });
+  res.on("close", () => {
+    if (!res.writableEnded && !child.killed) child.kill();
+  });
+});
 
 app.post("/api/ai/chat", async (req, res) => {
   const provider = req.body?.provider as Provider;
