@@ -115,3 +115,21 @@
 .gemini-tools button{white-space:nowrap}
 .gemini-tool-actions{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:700px){.gemini-tools{align-items:stretch;flex-direction:column}.gemini-tools button{width:100%}}
+
+.setup-view{max-width:1050px}
+.setup-card{margin-top:24px;padding:24px;border:1px solid var(--border,#303545);border-radius:16px;background:rgba(255,255,255,.035);max-width:760px}
+.setup-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:20px}
+.setup-card-heading h2,.setup-card h2{margin:6px 0;font-size:20px}
+.setup-card-heading p,.setup-card>p{margin:4px 0;color:var(--muted,#9aa3b2);font-size:13px}
+.setup-kicker{font-size:10px;letter-spacing:.14em;color:var(--muted,#9aa3b2)}
+.setup-status{font-size:11px;border:1px solid var(--border,#303545);padding:7px 10px;border-radius:20px;color:var(--muted,#9aa3b2)}
+.setup-status.connected{color:#77d6a1;border-color:rgba(119,214,161,.35)}
+.setup-field{display:flex;flex-direction:column;gap:8px;margin:18px 0;font-size:13px;color:var(--muted,#aab1c0)}
+.setup-field input,.setup-field select{width:100%;min-height:42px;padding:10px 12px;border:1px solid var(--border,#303545);border-radius:9px;background:#171b26;color:inherit}
+.setup-actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.setup-help{display:flex;gap:10px;align-items:flex-start;margin-top:20px;padding:12px;border-radius:10px;background:rgba(255,255,255,.035);color:var(--muted,#9aa3b2);font-size:12px;line-height:1.5}
+.secondary-setup{padding-top:18px;padding-bottom:18px}
+.setup-provider-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border,#303545);font-size:13px}
+.setup-provider-row span:last-child{color:var(--muted,#9aa3b2)}
+.setup-footer{max-width:760px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:18px;color:var(--muted,#9aa3b2);font-size:12px}
+@media(max-width:650px){.setup-card{padding:16px}.setup-card-heading,.setup-footer{align-items:stretch;flex-direction:column}.setup-actions>*{width:100%}}
