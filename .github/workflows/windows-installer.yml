@@ -29,10 +29,10 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Package Windows installer
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || github.head_ref == 'feature/web-first-vercel'
         run: npm run dist:win
       - name: Upload installer
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || github.head_ref == 'feature/web-first-vercel'
         uses: actions/upload-artifact@v4
         with:
           name: nova-ai-studio-windows
