@@ -6,6 +6,9 @@ on:
       - main
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - main
 permissions:
   contents: read
 jobs:
@@ -25,8 +28,10 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Package Windows installer
+        if: github.event_name != 'pull_request'
         run: npm run dist:win
       - name: Upload installer
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: nova-ai-studio-windows
