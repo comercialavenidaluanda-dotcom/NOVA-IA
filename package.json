@@ -4,6 +4,7 @@
   "private": true,
   "description": "NOVA AI STUDIO - editor multimédia e ambiente de desenvolvimento com IA",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite --host 0.0.0.0",
