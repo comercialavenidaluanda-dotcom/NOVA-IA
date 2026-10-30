@@ -55,7 +55,7 @@ export default function App() {
       setStatus("Resposta recebida");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Erro ao contactar IA");
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setApiKey(""); }
   }
 
   return <div className="app-shell">
