@@ -52,3 +52,8 @@ O workflow `.github/workflows/windows-installer.yml` executa verificação TypeS
 
 ## Separação de projetos
 Este repositório é exclusivo do NOVA AI STUDIO. Não contém credenciais nem integrações do NOVA Táxi, NOVA KZ ou KONECTA.
+
+
+## Integração Google Gemini
+
+O Build Studio permite validar uma Gemini API Key através da listagem oficial de modelos disponíveis para a chave. Após a validação, a interface apresenta os modelos compatíveis com `generateContent` e permite selecioná-los para conversas. A chave é enviada apenas ao serviço local durante o pedido e não é gravada no repositório. Para segurança, não a introduzas em ficheiros versionados nem a publiques em issues ou commits.
