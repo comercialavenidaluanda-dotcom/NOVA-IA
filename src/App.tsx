@@ -44,7 +44,8 @@ export default function App() {
     if (!apiKey.trim() || !prompt.trim()) { setStatus("Introduz a chave e o pedido."); return; }
     setBusy(true); setAnswer(""); setStatus("A contactar " + provider + "…");
     try {
-      const response = await fetch("/api/ai/chat", {
+      const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8787" : "";
+      const response = await fetch(apiBase + "/api/ai/chat", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider, apiKey, model: model.trim() || undefined, prompt })
       });
