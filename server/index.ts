@@ -13,7 +13,12 @@ const app = express();
 app.disable("x-powered-by");
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || origin === "null" || origin === "http://localhost:5173") return callback(null, true);
+    if (
+      !origin ||
+      origin === "null" ||
+      origin === "http://localhost:5173" ||
+      /^https:\/\/(?:[a-z0-9-]+\.)*vercel\.app$/i.test(origin)
+    ) return callback(null, true);
     return callback(new Error("Origem não autorizada."));
   }
 }));
@@ -182,5 +187,9 @@ app.post("/api/ai/chat", async (req, res) => {
   }
 });
 
-const port = Number(process.env.PORT || 8787);
-app.listen(port, "127.0.0.1", () => console.log("NOVA AI STUDIO API listening on 127.0.0.1:" + port));
+export default app;
+
+if (process.env.VERCEL !== "1") {
+  const port = Number(process.env.PORT || 8787);
+  app.listen(port, "127.0.0.1", () => console.log("NOVA AI STUDIO API listening on 127.0.0.1:" + port));
+}
